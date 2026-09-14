@@ -185,6 +185,52 @@ El formulario envía las variables `nombre`, `email`, `telefono`, `asunto` y `me
 
 Para usar una plantilla visual corporativa, copia el contenido de [docs/emailjs-template.html](docs/emailjs-template.html) en el editor HTML de EmailJS. La plantilla usa `{{name}}`, `{{email}}`, `{{telefono}}`, `{{title}}`, `{{message}}` y `{{time}}`, que el formulario envía directamente.
 
+## Publicar en Railway y Netlify
+
+### Backend en Railway
+
+1. Sube el repositorio a GitHub sin publicar ningún archivo `.env`.
+2. En Railway crea un proyecto con un servicio **MySQL** y otro servicio desde el repositorio. Configura el servicio del backend con **Root Directory** en `backend`.
+3. Railway detectará el comando `npm start` definido en [backend/package.json](backend/package.json). El servidor escucha automáticamente el puerto que Railway entrega mediante `PORT`.
+4. En las variables del servicio backend configura:
+
+```env
+JWT_SECRET=<cadena-larga-aleatoria>
+ADMIN_USER=<usuario-administrador>
+ADMIN_PASSWORD=<contrasena-segura>
+DB_HOST=${{MySQL.MYSQLHOST}}
+DB_PORT=${{MySQL.MYSQLPORT}}
+DB_USER=${{MySQL.MYSQLUSER}}
+DB_PASSWORD=${{MySQL.MYSQLPASSWORD}}
+DB_NAME=${{MySQL.MYSQLDATABASE}}
+FRONTEND_URL=https://<tu-sitio>.netlify.app
+```
+
+Reemplaza `MySQL` por el nombre exacto del servicio de base de datos en Railway. Si Railway no acepta las referencias entre servicios, copia sus valores `MYSQLHOST`, `MYSQLPORT`, `MYSQLUSER`, `MYSQLPASSWORD` y `MYSQLDATABASE` en las variables `DB_*`.
+
+5. Genera el dominio público del backend y comprueba `https://<tu-backend>.up.railway.app/health`, que debe responder `{ "status": "ok" }`.
+
+### Frontend en Netlify
+
+1. Crea un sitio nuevo desde el mismo repositorio y deja el directorio base en la raíz del proyecto.
+2. Netlify usará [netlify.toml](netlify.toml): ejecutará `npm run build` y publicará `dist`. El rewrite incluido permite abrir directamente rutas como `/nosotros`, `/proyectos` y `/admin`.
+3. En **Site configuration > Environment variables** configura:
+
+```env
+VITE_API_URL=https://<tu-backend>.up.railway.app
+```
+
+Añade también las variables `VITE_EMAILJS_SERVICE_ID`, `VITE_EMAILJS_TEMPLATE_ID` y `VITE_EMAILJS_PUBLIC_KEY` si utilizarás EmailJS. Después de modificar variables `VITE_*`, fuerza un nuevo deploy porque Vite las incorpora durante el build.
+
+4. Copia el dominio final de Netlify en `FRONTEND_URL` del servicio backend de Railway y vuelve a desplegar el backend. Para varios dominios permitidos, sepáralos por comas.
+
+### Comprobación final
+
+- Abre `/health` del backend y verifica la respuesta JSON.
+- Abre el sitio de Netlify y recarga directamente `/nosotros` o `/admin`.
+- Comprueba login, carga de contenido y envío del formulario de contacto.
+- Revisa los logs de Railway si falla la conexión a MySQL; el backend crea la base y sus tablas al arrancar, pero el servicio MySQL debe estar disponible y con las credenciales correctas.
+
 ## Gestión de contenido
 
 Desde `/admin` los perfiles autorizados pueden crear o editar contenido para proyectos, servicios, noticias, clientes, experiencia y slider. Cada registro incluye título, resumen, descripción, categoría, ubicación, slug, autor, fecha, estado e imagen.

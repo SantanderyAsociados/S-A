@@ -15,6 +15,10 @@ const JWT_SECRET = process.env.JWT_SECRET;
 const ADMIN_USER = process.env.ADMIN_USER || "admin";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "123";
 const DB_NAME = process.env.DB_NAME || "sya";
+const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:5173")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
 if (!JWT_SECRET) {
   throw new Error("JWT_SECRET no está definido en backend/.env");
@@ -33,8 +37,22 @@ const dbConfig = {
 
 const pool = mysql.createPool(dbConfig);
 
-app.use(cors({ origin: process.env.FRONTEND_URL || "*" }));
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes("*") || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Origen no permitido por CORS"));
+    },
+  })
+);
 app.use(express.json({ limit: "8mb" }));
+
+app.get("/health", (_req, res) => {
+  res.json({ status: "ok" });
+});
 
 async function inicializarBaseDeDatos() {
   const adminPool = mysql.createPool({
