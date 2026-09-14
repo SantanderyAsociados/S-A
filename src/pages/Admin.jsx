@@ -41,6 +41,7 @@ const menuItems = [
   { id: "noticias", label: "Blog / Noticias", icon: FileText },
   { id: "slider", label: "Slider principal", icon: GalleryHorizontalEnd },
   { id: "clientes", label: "Clientes", icon: Users },
+  { id: "equipo", label: "Equipo - Nosotros", icon: Users },
   { id: "experiencia", label: "Galería experiencia", icon: GalleryHorizontalEnd },
   { id: "mensajes", label: "Mensajes", icon: MessageSquare },
   { id: "usuarios", label: "Usuarios", icon: Users },
@@ -69,6 +70,7 @@ function Admin() {
     servicios: servicios.length,
     noticias: noticias.length,
     clientes: clientes.length,
+    equipo: 0,
   });
   const user = JSON.parse(localStorage.getItem("sya_admin_user") || "null");
   const role = (!user?.role || user?.role === "admin" || user?.role === "Administrador")
@@ -90,13 +92,14 @@ function Admin() {
     }
 
     cargarMensajes();
-    Promise.all(["proyectos", "servicios", "noticias", "clientes"].map((type) => getAdminContent(type)))
-      .then(([projectItems, serviceItems, newsItems, clientItems]) => {
+    Promise.all(["proyectos", "servicios", "noticias", "clientes", "equipo"].map((type) => getAdminContent(type)))
+      .then(([projectItems, serviceItems, newsItems, clientItems, equipoItems]) => {
         setContentCounts({
           proyectos: projectItems.length,
           servicios: serviceItems.length,
           noticias: newsItems.length,
           clientes: clientItems.length,
+          equipo: equipoItems.length,
         });
       })
       .catch(() => {});
@@ -405,7 +408,7 @@ function DashboardOverview({ counts, mensajes, openView }) {
 }
 
 function ContentView({ view, items, openView, onNew, onEdit, onDelete, canCreate, canEdit, canDelete, version = 0 }) {
-  const labels = { proyectos: "proyectos", servicios: "servicios", noticias: "noticias", clientes: "clientes", experiencia: "imágenes de experiencia" };
+  const labels = { proyectos: "proyectos", servicios: "servicios", noticias: "noticias", clientes: "clientes", equipo: "integrantes del equipo", experiencia: "imágenes de experiencia" };
   const [contentItems, setContentItems] = useState(items);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -425,20 +428,21 @@ function ContentView({ view, items, openView, onNew, onEdit, onDelete, canCreate
     <>
       <div className="admin-page-heading">
         <div><span className="admin-eyebrow">CONTENIDO</span><h1>{labels[view] || "Configuración"}</h1><p>Gestiona los elementos visibles en tu sitio web.</p></div>
-        {view !== "clientes" && canCreate && <button className="admin-primary-button" onClick={onNew}><span>+</span> Nuevo {view === "proyectos" ? "proyecto" : view === "noticias" ? "artículo" : view === "experiencia" ? "registro" : "servicio"}</button>}
+        {canCreate && <button className="admin-primary-button" onClick={onNew}><span>+</span> Nuevo {view === "proyectos" ? "proyecto" : view === "noticias" ? "artículo" : view === "experiencia" ? "registro" : view === "equipo" ? "integrante" : "cliente"}</button>}
       </div>
       <div className="admin-content-toolbar"><label className="admin-search"><span>Buscar</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={`Buscar ${labels[view]}`} /></label><span className="admin-results-count">{filteredItems.length} resultado{filteredItems.length === 1 ? "" : "s"}</span></div>
-      {loading ? <div className="admin-empty-state"><RefreshCw className="admin-spin" size={24} /><p>Cargando contenido...</p></div> : empty ? <div className="admin-empty-state"><span><FileText size={26} /></span><h2>{search ? "No se encontraron resultados" : `No hay ${labels[view]} todavía`}</h2><p>{search ? "Prueba con otro término de búsqueda." : "Cuando agregues contenido desde el editor, aparecerá aquí."}</p><button className="admin-secondary-button" onClick={() => openView("resumen")}>Volver al resumen</button></div> : <div className="admin-content-table">{filteredItems.map((item, index) => <div className="admin-content-row" key={item.id || item.slug || index}><div className="admin-content-thumb" style={item.imagen ? { backgroundImage: `url(${resolveImageUrl(item.imagen)})` } : undefined}><FileText size={18} /></div><div><strong>{item.nombre || item.titulo || item.name || `Elemento ${index + 1}`}</strong><small>{item.categoria || item.resumen || item.descripcion || "Contenido publicado"}{view === "noticias" && ` · ${item.autor || "Equipo S&A"}${item.fecha ? ` · ${item.fecha}` : ""}`}</small></div><span className={`admin-status-pill status-${(item.estado || "Publicado").toLowerCase()}`}><CheckCircle size={13} /> {item.estado || "Publicado"}</span>{view !== "clientes" && (canEdit || canDelete) && <div className="admin-row-actions">{canEdit && <button className="admin-row-action" onClick={() => onEdit(item)} aria-label="Editar elemento">Editar</button>}{canDelete && <button className="admin-row-action admin-row-delete" onClick={() => onDelete(item)} aria-label="Eliminar elemento">Eliminar</button>}</div>}</div>)}</div>}
+      {loading ? <div className="admin-empty-state"><RefreshCw className="admin-spin" size={24} /><p>Cargando contenido...</p></div> : empty ? <div className="admin-empty-state"><span><FileText size={26} /></span><h2>{search ? "No se encontraron resultados" : `No hay ${labels[view]} todavía`}</h2><p>{search ? "Prueba con otro término de búsqueda." : "Cuando agregues contenido desde el editor, aparecerá aquí."}</p><button className="admin-secondary-button" onClick={() => openView("resumen")}>Volver al resumen</button></div> : <div className="admin-content-table">{filteredItems.map((item, index) => <div className="admin-content-row" key={item.id || item.slug || index}><div className="admin-content-thumb" style={item.imagen ? { backgroundImage: `url(${resolveImageUrl(item.imagen)})` } : undefined}><FileText size={18} /></div><div><strong>{item.nombre || item.titulo || item.name || `Elemento ${index + 1}`}</strong><small>{item.categoria || item.resumen || item.descripcion || "Contenido publicado"}{view === "noticias" && ` · ${item.autor || "Equipo S&A"}${item.fecha ? ` · ${item.fecha}` : ""}`}</small></div><span className={`admin-status-pill status-${(item.estado || "Publicado").toLowerCase()}`}><CheckCircle size={13} /> {item.estado || "Publicado"}</span>{(canEdit || canDelete) && <div className="admin-row-actions">{canEdit && <button className="admin-row-action" onClick={() => onEdit(item)} aria-label="Editar elemento">Editar</button>}{canDelete && <button className="admin-row-action admin-row-delete" onClick={() => onDelete(item)} aria-label="Eliminar elemento">Eliminar</button>}</div>}</div>)}</div>}
     </>
   );
 }
 
 function BasicEditor({ view, item, canPublish = true, onClose, onSaved }) {
-  const contentLabels = { proyectos: "proyecto", servicios: "servicio", noticias: "artículo", experiencia: "registro de experiencia" };
+  const contentLabels = { proyectos: "proyecto", servicios: "servicio", noticias: "artículo", clientes: "cliente", equipo: "integrante del equipo", experiencia: "registro de experiencia" };
   const label = contentLabels[view] || "contenido";
   const [form, setForm] = useState({
     titulo: item?.titulo || item?.nombre || "",
     categoria: item?.categoria || "",
+    subtitulo: item?.subtitulo || "",
     descripcion: item?.descripcion || "",
     imagen: item?.imagen || "",
     slug: item?.slug || "",
@@ -477,10 +481,15 @@ function BasicEditor({ view, item, canPublish = true, onClose, onSaved }) {
     event.preventDefault();
     try {
       setSaving(true);
+      const payload = {
+        ...form,
+        descripcion: form.descripcion || form.subtitulo || form.titulo || "Contenido",
+        categoria: view === "equipo" ? "Equipo S&A" : form.categoria,
+      };
       if (item) {
-        await updateContent(view, item.id, form);
+        await updateContent(view, item.id, payload);
       } else {
-        await createContent(view, form);
+        await createContent(view, payload);
       }
       setSaved(true);
       if (onSaved) onSaved();
@@ -498,8 +507,9 @@ function BasicEditor({ view, item, canPublish = true, onClose, onSaved }) {
         <div className="admin-editor-heading"><div><span className="admin-eyebrow">EDICIÓN AVANZADA</span><h2 id="editor-title">{item ? "Editar" : "Nuevo"} {label}</h2></div><button className="admin-editor-close" onClick={onClose} aria-label="Cerrar editor">×</button></div>
         <form onSubmit={save}>
           <label className="admin-field"><span>{view === "noticias" ? "Título" : "Nombre"}</span><input name="titulo" value={form.titulo} onChange={updateForm} placeholder={`Escribe el ${label}`} required /></label>
-          <label className="admin-field"><span>{view === "proyectos" ? "Categoría" : "Resumen"}</span><input name="categoria" value={form.categoria} onChange={updateForm} placeholder={view === "proyectos" ? "Ej. Infraestructura vial" : "Descripción breve"} required /></label>
-          <label className="admin-field"><span>Descripción</span><textarea name="descripcion" value={form.descripcion} onChange={updateForm} placeholder="Añade la información principal" rows="4" required /></label>
+          {view === "equipo" && <label className="admin-field"><span>Cargo</span><input name="subtitulo" value={form.subtitulo} onChange={updateForm} placeholder="Ej. Ingeniero de Diseño" required /></label>}
+          {view !== "equipo" && view !== "clientes" && <label className="admin-field"><span>{view === "proyectos" ? "Categoría" : "Resumen"}</span><input name="categoria" value={form.categoria} onChange={updateForm} placeholder={view === "proyectos" ? "Ej. Infraestructura vial" : "Descripción breve"} required /></label>}
+          {view !== "equipo" && view !== "clientes" && <label className="admin-field"><span>Descripción</span><textarea name="descripcion" value={form.descripcion} onChange={updateForm} placeholder="Añade la información principal" rows="4" required /></label>}
           <label className="admin-field"><span>URL de imagen</span><input name="imagen" value={form.imagen} onChange={updateForm} placeholder="/images/nombre-de-imagen.jpg" /></label>
           <label className="admin-upload-field"><span>O selecciona una imagen del computador</span><input type="file" accept="image/*" onChange={handleLocalImage} /></label>
           {form.imagen && <button type="button" className="admin-remove-image" onClick={() => setForm((current) => ({ ...current, imagen: "" }))}><Trash2 size={14} /> Quitar imagen</button>}

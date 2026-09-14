@@ -169,6 +169,85 @@ async function inicializarBaseDeDatos() {
     );
   }
 
+  // Migración inicial de la sección Nosotros. Solo se ejecuta si no existen registros
+  // de estos tipos; después, los cambios hechos desde Admin quedan únicamente en MySQL.
+  const equipoInicial = [
+    ["Jorge Alfredo Santander Moya", "Gerente General", "/equipo/jorge.jpg"],
+    ["Jose Nelson Diaz Cardenas", "Director de Proyectos", "/equipo/jose.jpg"],
+    ["Luis Fernando Santander Moya", "Director de Proyectos", "/equipo/luis.jpg"],
+    ["Lizeth Andrea Bautista", "Directora Administrativa", "/equipo/lizeth.jpg"],
+    ["Braham Nicolas Mirque Rodriguez", "Coordinador BIM", "/equipo/braham.jpg"],
+    ["Paulo Cesar Rebolledo Palacios", "Ingeniero de Diseño", "/equipo/paulo.jpg"],
+    ["Luisa Maria Chala Madrigal", "Secretaria", "/equipo/luisa.jpg"],
+    ["Jenny Esperanza Ortiz", "Asesor Externo SST", "/equipo/jenny.jpg"],
+    ["Lina Maria Parga Hernandez", "Ingeniera de Diseño", "/equipo/lina.jpg"],
+    ["Jhon Anderson Lesmes", "Dibujante", "/equipo/jhon.jpg"],
+    ["Jarrison Favian Vaquen Lozano", "Dibujante", "/equipo/jarrison.jpg"],
+    ["Edgar Nicolas Fuentes Alfonso", "Ingeniero de Diseño", "/equipo/edgar.jpg"],
+    ["Edwin Leonardo Gonzalez Rojas", "Dibujante", "/equipo/edwin.jpg"],
+    ["Dayana Patricia Molina Tilano", "Ingeniera de Diseño", "/equipo/dayana.jpg"],
+    ["Dolly Lizeth Fonseca Peña", "Auxiliar Varios", "/equipo/dolly.jpg"],
+    ["Daniel Alejandro Molano Huertas", "Ingeniero de Diseño", "/equipo/daniel.jpg"],
+    ["Brandon Felipe Morales Herrera", "Aprendiz SENA", "/equipo/brandon.jpg"],
+  ];
+
+  const clientesIniciales = [
+    "/images/LOGOS CLIENTES/ARQUIURBANA.png",
+    "/images/LOGOS CLIENTES/calymayor.png",
+    "/images/LOGOS CLIENTES/cass.jpg",
+    "/images/LOGOS CLIENTES/COLPATRIA.png",
+    "/images/LOGOS CLIENTES/concay.png",
+    "/images/LOGOS CLIENTES/conconcreto.jpg",
+    "/images/LOGOS CLIENTES/ENTORNO.jpg",
+    "/images/LOGOS CLIENTES/gisaico.png",
+    "/images/LOGOS CLIENTES/gradeco.png",
+    "/images/LOGOS CLIENTES/hace ingenieros.png",
+    "/images/LOGOS CLIENTES/KMA.png",
+    "/images/LOGOS CLIENTES/latinco.jpg",
+    "/images/LOGOS CLIENTES/NORDESTE.png",
+    "/images/LOGOS CLIENTES/oxy.png",
+    "/images/LOGOS CLIENTES/planificadas.png",
+    "/images/LOGOS CLIENTES/PACIFICO 3.png",
+    "/images/LOGOS CLIENTES/prourbanos.jpg",
+    "/images/LOGOS CLIENTES/ruta40.jpg",
+    "/images/LOGOS CLIENTES/sesac.png",
+    "/images/LOGOS CLIENTES/SISGA.jpg",
+    "/images/LOGOS CLIENTES/sonacol.jpg",
+    "/images/LOGOS CLIENTES/tecnoconsulta.jpg",
+    "/images/LOGOS CLIENTES/URBANSA.jpg",
+  ];
+
+  const [[equipoCount]] = await pool.query(
+    "SELECT COUNT(*) AS total FROM contenido WHERE tipo = 'equipo'"
+  );
+  if (Number(equipoCount.total) === 0) {
+    for (let i = 0; i < equipoInicial.length; i += 1) {
+      const [nombre, cargo, imagen] = equipoInicial[i];
+      await pool.query(
+        `INSERT INTO contenido
+         (tipo, titulo, subtitulo, categoria, ubicacion, resumen, descripcion, imagen, slug, autor, estado, orden)
+         VALUES ('equipo', ?, ?, ?, '', ?, ?, ?, ?, 'S&A', 'Publicado', ?)`,
+        [nombre, cargo, cargo, cargo, cargo, imagen, `equipo-${i + 1}-${Date.now()}-${i}`, i]
+      );
+    }
+  }
+
+  const [[clientesCount]] = await pool.query(
+    "SELECT COUNT(*) AS total FROM contenido WHERE tipo = 'clientes'"
+  );
+  if (Number(clientesCount.total) === 0) {
+    for (let i = 0; i < clientesIniciales.length; i += 1) {
+      const imagen = clientesIniciales[i];
+      const nombre = `Cliente ${i + 1}`;
+      await pool.query(
+        `INSERT INTO contenido
+         (tipo, titulo, subtitulo, categoria, ubicacion, resumen, descripcion, imagen, slug, autor, estado, orden)
+         VALUES ('clientes', ?, '', '', '', '', '', ?, ?, 'S&A', 'Publicado', ?)`,
+        [nombre, imagen, `cliente-${i + 1}-${Date.now()}-${i}`, i]
+      );
+    }
+  }
+
   const [users] = await pool.query(
     "SELECT id FROM admin_users WHERE username = ? LIMIT 1",
     [ADMIN_USER]
@@ -206,6 +285,7 @@ const TIPOS_CONTENIDO = new Set([
   "clientes",
   "experiencia",
   "slider",
+  "equipo",
 ]);
 
 function validarTipoContenido(req, res, next) {

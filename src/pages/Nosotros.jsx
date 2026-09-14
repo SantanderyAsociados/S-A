@@ -1,130 +1,37 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { getPublicContent, resolveImageUrl } from "../utils/contentApi";
 import Navbar from "../components/Navbar";
 
 function Nosotros() {
   const [mostrarTodos, setMostrarTodos] = useState(false);
 
-  // =========================
-  // EQUIPO
-  // =========================
+  // El contenido de Equipo y Clientes viene de MySQL mediante la API.
+  // Ya no se mantiene una lista fija en este componente.
+  const [equipo, setEquipo] = useState([]);
+  const [clientes, setClientes] = useState([]);
+  const [cargandoContenido, setCargandoContenido] = useState(true);
 
-  const equipo = [
-    {
-      nombre: "Jorge Alfredo Santander Moya",
-      cargo: "Gerente General",
-      foto: "/equipo/jorge.jpg",
-    },
-    {
-      nombre: "Jose Nelson Diaz Cardenas",
-      cargo: "Director de Proyectos",
-      foto: "/equipo/jose.jpg",
-    },
-    {
-      nombre: "Luis Fernando Santander Moya",
-      cargo: "Director de Proyectos",
-      foto: "/equipo/luis.jpg",
-    },
-    {
-      nombre: "Lizeth Andrea Bautista",
-      cargo: "Directora Administrativa",
-      foto: "/equipo/lizeth.jpg",
-    },
-    {
-      nombre: "Braham Nicolas Mirque Rodriguez",
-      cargo: "Coordinador BIM",
-      foto: "/equipo/braham.jpg",
-    },
-    {
-      nombre: "Paulo Cesar Rebolledo Palacios",
-      cargo: "Ingeniero de Diseño",
-      foto: "/equipo/paulo.jpg",
-    },
-    {
-      nombre: "Luisa Maria Chala Madrigal",
-      cargo: "Secretaria",
-      foto: "/equipo/luisa.jpg",
-    },
-    {
-      nombre: "Jenny Esperanza Ortiz",
-      cargo: "Asesor Externo SST",
-      foto: "/equipo/jenny.jpg",
-    },
-    {
-      nombre: "Lina Maria Parga Hernandez",
-      cargo: "Ingeniera de Diseño",
-      foto: "/equipo/lina.jpg",
-    },
-    {
-      nombre: "Jhon Anderson Lesmes",
-      cargo: "Dibujante",
-      foto: "/equipo/jhon.jpg",
-    },
-    {
-      nombre: "Jarrison Favian Vaquen Lozano",
-      cargo: "Dibujante",
-      foto: "/equipo/jarrison.jpg",
-    },
-    {
-      nombre: "Edgar Nicolas Fuentes Alfonso",
-      cargo: "Ingeniero de Diseño",
-      foto: "/equipo/edgar.jpg",
-    },
-    {
-      nombre: "Edwin Leonardo Gonzalez Rojas",
-      cargo: "Dibujante",
-      foto: "/equipo/edwin.jpg",
-    },
-    {
-      nombre: "Dayana Patricia Molina Tilano",
-      cargo: "Ingeniera de Diseño",
-      foto: "/equipo/dayana.jpg",
-    },
-    {
-      nombre: "Dolly Lizeth Fonseca Peña",
-      cargo: "Auxiliar Varios",
-      foto: "/equipo/dolly.jpg",
-    },
-    {
-      nombre: "Daniel Alejandro Molano Huertas",
-      cargo: "Ingeniero de Diseño",
-      foto: "/equipo/daniel.jpg",
-    },
-    {
-      nombre: "Brandon Felipe Morales Herrera",
-      cargo: "Aprendiz SENA",
-      foto: "/equipo/brandon.jpg",
-    },
-  ];
+  useEffect(() => {
+    let activo = true;
 
-  // =========================
-  // CLIENTES
-  // =========================
+    Promise.all([getPublicContent("equipo"), getPublicContent("clientes")])
+      .then(([equipoData, clientesData]) => {
+        if (!activo) return;
+        setEquipo(equipoData);
+        setClientes(clientesData);
+      })
+      .catch((error) => {
+        console.error("No se pudo cargar Equipo/Clientes desde la base de datos:", error);
+        if (!activo) return;
+        setEquipo([]);
+        setClientes([]);
+      })
+      .finally(() => {
+        if (activo) setCargandoContenido(false);
+      });
 
-  const clientes = [
-    "/public/images/LOGOS CLIENTES/ARQUIURBANA.png",
-    "/public/images/LOGOS CLIENTES/calymayor.png",
-    "/public/images/LOGOS CLIENTES/cass.jpg",
-    "/public/images/LOGOS CLIENTES/COLPATRIA.png",
-    "/public/images/LOGOS CLIENTES/concay.png",
-    "/public/images/LOGOS CLIENTES/conconcreto.jpg",
-    "/public/images/LOGOS CLIENTES/ENTORNO.jpg",
-    "/public/images/LOGOS CLIENTES/gisaico.png",
-    "/public/images/LOGOS CLIENTES/gradeco.png",
-    "/public/images/LOGOS CLIENTES/hace ingenieros.png",
-    "/public/images/LOGOS CLIENTES/KMA.png",
-    "/public/images/LOGOS CLIENTES/latinco.jpg",
-    "/public/images/LOGOS CLIENTES/NORDESTE.png",
-    "/public/images/LOGOS CLIENTES/oxy.png",
-    "/public/images/LOGOS CLIENTES/planificadas.png",
-    "/public/images/LOGOS CLIENTES/PACIFICO 3.png",
-    "/public/images/LOGOS CLIENTES/prourbanos.jpg",
-    "/public/images/LOGOS CLIENTES/ruta40.jpg",
-    "/public/images/LOGOS CLIENTES/sesac.png",
-    "/public/images/LOGOS CLIENTES/SISGA.jpg",
-    "/public/images/LOGOS CLIENTES/sonacol.jpg",
-    "/public/images/LOGOS CLIENTES/tecnoconsulta.jpg",
-    "/public/images/LOGOS CLIENTES/URBANSA.jpg",
-  ];
+    return () => { activo = false; };
+  }, []);
 
   return (
     <>
@@ -501,6 +408,8 @@ function Nosotros() {
               Profesionales al servicio de cada proyecto
             </h2>
 
+            {cargandoContenido && <p>Cargando equipo...</p>}
+
 
             <div className="team-grid">
 
@@ -508,7 +417,7 @@ function Nosotros() {
 
                 <div
                   className="team-card"
-                  key={`${persona.nombre}-${persona.cargo}`}
+                  key={`${persona.titulo}-${persona.subtitulo || persona.categoria || persona.descripcion}`}
                 >
 
                   {/* FOTO */}
@@ -516,8 +425,8 @@ function Nosotros() {
                   <div className="team-photo">
 
                     <img
-                      src={persona.foto}
-                      alt={`Foto de ${persona.nombre}`}
+                      src={resolveImageUrl(persona.imagen)}
+                      alt={`Foto de ${persona.titulo}`}
                     />
 
                   </div>
@@ -526,14 +435,14 @@ function Nosotros() {
                   {/* NOMBRE */}
 
                   <h3>
-                    {persona.nombre}
+                    {persona.titulo}
                   </h3>
 
 
                   {/* CARGO */}
 
                   <strong>
-                    {persona.cargo}
+                    {persona.subtitulo || persona.categoria || persona.descripcion}
                   </strong>
 
                 </div>
@@ -571,6 +480,8 @@ function Nosotros() {
                 de ingeniería.
               </p>
 
+              {cargandoContenido && <p className="clients-intro">Cargando clientes...</p>}
+
             </div>
 
 
@@ -580,16 +491,16 @@ function Nosotros() {
 
               {clientes
                 .slice(0, mostrarTodos ? clientes.length : 6)
-                .map((logo, index) => (
+                .map((cliente) => (
 
                   <div
                     className="client-card"
-                    key={index}
+                    key={cliente.id || cliente.slug}
                   >
 
                     <img
-                      src={logo}
-                      alt={`Logo de cliente ${index + 1}`}
+                      src={resolveImageUrl(cliente.imagen)}
+                      alt={cliente.titulo || "Logo de cliente"}
                     />
 
                   </div>
