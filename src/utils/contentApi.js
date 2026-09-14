@@ -36,8 +36,22 @@ async function request(path, options = {}) {
   });
 
   if (!response.ok) {
-    const data = await response.json().catch(() => ({}));
-    throw new Error(data.message || "No se pudo completar la solicitud");
+    const body = await response.text();
+    let message = "No se pudo completar la solicitud";
+    try {
+      const data = JSON.parse(body);
+      message = data.message || data.error || message;
+    } catch {
+      if (body.trim()) message = body.slice(0, 180);
+    }
+
+    if (response.status === 401) {
+      message = "La sesión administrativa expiró. Inicia sesión nuevamente.";
+    } else if (response.status === 403) {
+      message = "Tu usuario no tiene permiso para modificar este contenido.";
+    }
+
+    throw new Error(`${message} (HTTP ${response.status})`);
   }
 
   return response.json();
