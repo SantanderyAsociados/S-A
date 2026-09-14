@@ -156,7 +156,7 @@ function Nosotros() {
               >
 
                 <img
-                  src="public/images/PAPA/IMG-6573.JPG"
+                  src="/images/PAPA/IMG-6573.JPG"
                   alt="Alfredo Santander"
                   style={{
                     width: "100%",
@@ -183,7 +183,7 @@ function Nosotros() {
               >
 
                 <img
-                  src="public/images/PAPA/IMG_8525.jpg"
+                  src="/images/PAPA/IMG_8525.jpg"
                   alt="Reconocimiento de Alfredo Santander"
                   style={{
                     width: "100%",
