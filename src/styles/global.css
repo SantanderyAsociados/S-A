@@ -403,6 +403,55 @@ a {
 
 
 /* =========================
+   SOCIO FUNDADOR
+========================= */
+
+.founder-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.4fr);
+  gap: clamp(35px, 6vw, 70px);
+  align-items: center;
+}
+
+.founder-gallery {
+  display: grid;
+  gap: 25px;
+}
+
+.founder-image {
+  width: 100%;
+  overflow: hidden;
+  border-radius: 20px;
+  background: #e5e7eb;
+}
+
+.founder-image-main {
+  aspect-ratio: 4 / 5;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.12);
+}
+
+.founder-image-secondary {
+  aspect-ratio: 16 / 8;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.founder-image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.founder-content h2 {
+  margin: 12px 0 25px;
+}
+
+.founder-content p {
+  max-width: 68ch;
+}
+
+
+/* =========================
    VALORES
 ========================= */
 
@@ -1202,10 +1251,23 @@ a {
   .two-column,
   .mission-grid,
   .service-intro,
-  .contact-grid {
+  .contact-grid,
+  .founder-layout {
     grid-template-columns: 1fr;
 
     gap: 40px;
+  }
+
+  .founder-gallery {
+    gap: 18px;
+  }
+
+  .founder-image-main {
+    aspect-ratio: 4 / 3;
+  }
+
+  .founder-image-secondary {
+    aspect-ratio: 16 / 9;
   }
 
   .form-row {

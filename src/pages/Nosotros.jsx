@@ -117,53 +117,23 @@ function Nosotros() {
             SOCIO FUNDADOR
         ========================= */}
 
-        <section className="section gray-section">
+        <section className="section gray-section founder-section" aria-labelledby="founder-title">
 
-          <div
-            className="section-container"
-            style={{
-              display: "grid",
-              gridTemplateColumns:
-                "minmax(320px, 0.85fr) minmax(0, 1.4fr)",
-              gap: "70px",
-              alignItems: "center",
-            }}
-          >
+          <div className="section-container founder-layout">
 
             {/* =========================
                 FOTOS
             ========================= */}
 
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "25px",
-              }}
-            >
+            <div className="founder-gallery">
 
               {/* FOTO PRINCIPAL */}
 
-              <div
-                style={{
-                  width: "100%",
-                  height: "390px",
-                  borderRadius: "20px",
-                  overflow: "hidden",
-                  background: "#e5e7eb",
-                  boxShadow: "0 15px 35px rgba(0,0,0,0.12)",
-                }}
-              >
+              <div className="founder-image founder-image-main">
 
                 <img
                   src="/images/PAPA/IMG_8525.jpg"
                   alt="Alfredo Santander"
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                    display: "block",
-                  }}
                 />
 
               </div>
@@ -171,26 +141,11 @@ function Nosotros() {
 
               {/* SEGUNDA FOTO */}
 
-              <div
-                style={{
-                  width: "100%",
-                  height: "220px",
-                  borderRadius: "20px",
-                  overflow: "hidden",
-                  background: "#e5e7eb",
-                  boxShadow: "0 10px 25px rgba(0,0,0,0.10)",
-                }}
-              >
+              <div className="founder-image founder-image-secondary">
 
                 <img
                   src="/images/PAPA/IMG-6573.JPG"
                   alt="Reconocimiento de Alfredo Santander"
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                    display: "block",
-                  }}
                 />
 
               </div>
@@ -202,18 +157,13 @@ function Nosotros() {
                 INFORMACIÓN DEL FUNDADOR
             ========================= */}
 
-            <div className="content-text">
+            <div className="content-text founder-content">
 
               <span className="section-label">
                 A NUESTRO SOCIO FUNDADOR
               </span>
 
-              <h2
-                style={{
-                  marginTop: "12px",
-                  marginBottom: "25px",
-                }}
-              >
+              <h2 id="founder-title">
                 Alfredo Santander
               </h2>
 
