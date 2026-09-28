@@ -10,13 +10,13 @@ const HOME_SLIDES = [
     imagen: "/images/INFO BASE WEB/EDIFICIOS/8-1. ALLURE.png",
     collage: [
       "/images/INFO BASE WEB/EDIFICIOS/8-1. ALLURE.png",
-      "public/images/infra_2.jfif",
-      "public/images/pte_2.jfif",
-      "public/images/pte_3.jfif",
-      "public/images/trasnmi_2.jfif",
-      "public/images/pte_eden_2perspectiva.jfif",
-      "public/images/puente_1.jfif",
-      "public/images/infra.jfif"
+      "/images/infra_2.jfif",
+      "/images/pte_2.jfif",
+      "/images/pte_3.jfif",
+      "/images/trasnmi_2.jfif",
+      "/images/pte_eden_2perspectiva.jfif",
+      "/images/puente_1.jfif",
+      "/images/infra.jfif"
     ],
   },
   // IMAGEN 2: cambia únicamente la ruta de imagen aquí.
