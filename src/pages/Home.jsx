@@ -8,6 +8,16 @@ const HOME_SLIDES = [
     titulo: "Ingeniería estructural que construye confianza.",
     descripcion: "Soluciones de ingeniería, diseño estructural, consultoría e interventoría para proyectos de infraestructura y edificación.",
     imagen: "/images/INFO BASE WEB/EDIFICIOS/8-1. ALLURE.png",
+    collage: [
+      "/images/INFO BASE WEB/EDIFICIOS/8-1. ALLURE.png",
+      "public/images/infra_2.jfif",
+      "public/images/pte_2.jfif",
+      "public/images/pte_3.jfif",
+      "public/images/trasnmi_2.jfif",
+      "public/images/pte_eden_2perspectiva.jfif",
+      "public/images/puente_1.jfif",
+      "public/images/infra.jfif"
+    ],
   },
   // IMAGEN 2: cambia únicamente la ruta de imagen aquí.
   {
@@ -38,6 +48,7 @@ function Home() {
 
   const slide = slides[activeSlide] || slides[0];
   const slideImage = encodeURI(slide.imagen);
+  const isCollageSlide = activeSlide === 0;
 
   return (
     <>
@@ -47,7 +58,15 @@ function Home() {
       <main>
 
         {/* HERO */}
-        <section className="hero" style={{ backgroundImage: slideImage ? `linear-gradient(rgba(5, 15, 28, .24), rgba(5, 15, 28, .24)), url(${slideImage})` : "linear-gradient(135deg, #152b40, #304d63)" }}>
+        <section className={`hero${isCollageSlide ? " hero--collage" : ""}`} style={isCollageSlide ? undefined : { backgroundImage: slideImage ? `linear-gradient(rgba(5, 15, 28, .24), rgba(5, 15, 28, .24)), url(${slideImage})` : "linear-gradient(135deg, #152b40, #304d63)" }}>
+
+          {isCollageSlide && (
+            <div className="hero-collage" aria-hidden="true">
+              {slide.collage.map((image) => (
+                <img src={encodeURI(image)} alt="" key={image} />
+              ))}
+            </div>
+          )}
 
           <div className="hero-overlay"></div>
 
