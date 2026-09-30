@@ -199,6 +199,7 @@ function Contacto() {
                   desarrollo, puede comunicarse con
                   nosotros.
                 </p>
+                <p>Si deseas hacer parte de nuestro equipo, envíanos tu hoja de vida a la siguiente dirección de correo electrónico</p>
 
                 <div className="contact-item">
                   <div className="contact-icon">
