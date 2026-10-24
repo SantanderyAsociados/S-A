@@ -660,6 +660,13 @@ function fechaLocalActual() {
   return `${year}-${month}-${day}`;
 }
 
+function fechaMesActual() {
+  const hoy = new Date();
+  const year = hoy.getFullYear();
+  const month = String(hoy.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
+}
+
 function calcularJornada(horaEntrada, horaSalida) {
   if (!horaEntrada || !horaSalida) return null;
   const entrada = /^([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/.exec(horaEntrada);
@@ -696,6 +703,7 @@ function HoursView({ canCreate, isAdmin }) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
+  const [selectedMonth, setSelectedMonth] = useState(fechaMesActual());
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [projectNames, setProjectNames] = useState([]);
   const [projectLoadError, setProjectLoadError] = useState("");
@@ -710,7 +718,12 @@ function HoursView({ canCreate, isAdmin }) {
   });
   const resumenJornada = calcularJornada(form.hora_entrada, form.hora_salida);
   const user = JSON.parse(localStorage.getItem("sya_admin_user") || "null");
-  const totalWorkedMinutes = records.reduce((total, record) => total + minutosTrabajados(record), 0);
+  const visibleRecords = records.filter((record) => {
+    const matchesMonth = !selectedMonth || record.fecha.startsWith(selectedMonth);
+    const matchesDate = !selectedDate || record.fecha === selectedDate;
+    return matchesMonth && matchesDate;
+  });
+  const totalWorkedMinutes = visibleRecords.reduce((total, record) => total + minutosTrabajados(record), 0);
   const targetMinutes = 175 * 60;
   const estimatedValue = Math.round((totalWorkedMinutes / 60) * 35000);
   const compliance = Math.min(100, Math.round((totalWorkedMinutes / targetMinutes) * 100));
@@ -731,8 +744,8 @@ function HoursView({ canCreate, isAdmin }) {
   }, []);
 
   useEffect(() => {
-    if (!isAdmin) return undefined;
     let active = true;
+    setLoading(true);
     getHourRecords(selectedDate)
       .then((data) => {
         if (active) {
@@ -750,7 +763,7 @@ function HoursView({ canCreate, isAdmin }) {
     return () => {
       active = false;
     };
-  }, [isAdmin, selectedDate, refreshVersion]);
+  }, [selectedDate, refreshVersion]);
 
   const saveRecord = async (event) => {
     event.preventDefault();
@@ -768,7 +781,9 @@ function HoursView({ canCreate, isAdmin }) {
         ...form,
         tiempo_estimado: jornada.workedMinutes / 60,
       });
-      if (isAdmin && (!selectedDate || selectedDate === record.fecha)) {
+      const matchesMonth = !selectedMonth || record.fecha.startsWith(selectedMonth);
+      const matchesDate = !selectedDate || selectedDate === record.fecha;
+      if (matchesMonth && matchesDate) {
         setRecords((current) => [record, ...current].sort((a, b) => (
           b.fecha.localeCompare(a.fecha)
           || b.hora_entrada.localeCompare(a.hora_entrada)
@@ -817,7 +832,7 @@ function HoursView({ canCreate, isAdmin }) {
       });
       setRecords((current) => current
         .map((record) => record.id === editingId ? updatedRecord : record)
-        .filter((record) => !selectedDate || record.fecha === selectedDate));
+        .filter((record) => (!selectedDate || record.fecha === selectedDate) && (!selectedMonth || record.fecha.startsWith(selectedMonth))));
       setEditingId(null);
       setEditForm(null);
     } catch (requestError) {
@@ -850,13 +865,16 @@ function HoursView({ canCreate, isAdmin }) {
         <div>
           <span className="admin-eyebrow">{isAdmin ? "CONTROL DE JORNADAS" : "MI JORNADA"}</span>
           <h1>Registro de horas</h1>
-          <p>{isAdmin ? "Consulta, filtra por fecha y administra las jornadas de todos los trabajadores." : "Agrega tus horas de entrada y salida, cliente y proyecto."}</p>
+          <p>{isAdmin ? "Consulta por mes y revisa el rendimiento de cada trabajador." : "Selecciona el mes y revisa cuánto has trabajado."}</p>
         </div>
-        {isAdmin && <div className="admin-hours-filter">
-          <label className="admin-field"><span>Consultar fecha</span><input type="date" value={selectedDate} onChange={(event) => { setLoading(true); setSelectedDate(event.target.value); }} /></label>
-          <button type="button" className="admin-secondary-button" onClick={() => { setLoading(true); setSelectedDate(""); }} disabled={!selectedDate}>Ver todas</button>
+        <div className="admin-hours-filter">
+          <label className="admin-field"><span>Mes</span><input type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} /></label>
+          {isAdmin && (
+            <label className="admin-field"><span>Fecha exacta</span><input type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} /></label>
+          )}
+          <button type="button" className="admin-secondary-button" onClick={() => { setLoading(true); setSelectedDate(""); setSelectedMonth(fechaMesActual()); }} disabled={loading && !selectedDate && selectedMonth === fechaMesActual()}>Ver este mes</button>
           <button type="button" className="admin-secondary-button" onClick={() => { setLoading(true); setRefreshVersion((current) => current + 1); }} disabled={loading}><RefreshCw size={15} /> Actualizar</button>
-        </div>}
+        </div>
       </div>
 
       <div className="admin-hours-hero">
@@ -935,10 +953,10 @@ function HoursView({ canCreate, isAdmin }) {
       )}
 
       {error && isAdmin && <p className="admin-hours-error" role="alert">{error}</p>}
-      {isAdmin && (loading ? (
+      {loading ? (
         <div className="admin-empty-state"><RefreshCw className="admin-spin" size={24} /><p>Cargando registros...</p></div>
-      ) : records.length === 0 ? (
-        <div className="admin-empty-state"><span><Clock3 size={26} /></span><h2>No hay registros</h2><p>{selectedDate ? "No hay registros para la fecha seleccionada." : "Los registros de horas guardados aparecerán aquí."}</p></div>
+      ) : visibleRecords.length === 0 ? (
+        <div className="admin-empty-state"><span><Clock3 size={26} /></span><h2>No hay registros</h2><p>{selectedDate ? "No hay registros para la fecha seleccionada." : selectedMonth ? `No hay registros para ${new Date(`${selectedMonth}-01T00:00:00`).toLocaleDateString("es-CO", { month: "long", year: "numeric" })}.` : "Los registros de horas guardados aparecerán aquí."}</p></div>
       ) : (
         <div className="admin-hours-table-scroll">
           <table className="admin-hours-table">
@@ -956,7 +974,7 @@ function HoursView({ canCreate, isAdmin }) {
               </tr>
             </thead>
             <tbody>
-              {records.map((record) => {
+              {visibleRecords.map((record) => {
                 const actualMinutes = minutosTrabajados(record);
                 return (
                   <tr key={record.id}>
@@ -990,7 +1008,7 @@ function HoursView({ canCreate, isAdmin }) {
             </tbody>
           </table>
         </div>
-      ))}
+      )}
     </>
   );
 }
