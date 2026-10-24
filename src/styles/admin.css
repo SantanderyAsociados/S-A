@@ -137,19 +137,124 @@
 .admin-user-form { margin-bottom: 20px; padding: 24px; border: 1px solid var(--admin-line); border-radius: 5px; background: var(--admin-surface); }
 .admin-user-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; }
 .admin-user-fields .admin-field { margin-top: 0; }
-.admin-hours-form { margin-bottom: 22px; padding: 26px; border-radius: 10px; box-shadow: 0 12px 34px rgba(23,43,59,.06); }
-.admin-hours-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 185px), 1fr)); gap: 16px; }
+.admin-hours-page-heading { margin-bottom: 18px; }
+.admin-hours-hero {
+  margin-bottom: 24px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #1d2b3d 0%, #1b2e4d 100%);
+  box-shadow: 0 14px 20px rgba(13, 25, 38, 0.12);
+  border: 1px solid rgba(122, 137, 168, 0.2);
+}
+.admin-hours-hero-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 28px;
+  background: linear-gradient(90deg, rgba(111, 99, 240, 0.92), rgba(112, 82, 244, 0.8));
+  border-radius: 18px 18px 0 0;
+}
+.admin-hours-hero-label {
+  display: block;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.76);
+}
+.admin-hours-hero-head strong {
+  display: block;
+  margin-top: 6px;
+  color: #fff;
+  font-size: clamp(20px, 2vw, 34px);
+  letter-spacing: -0.04em;
+}
+.admin-hours-hero-button {
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  padding: 10px 18px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.admin-hours-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin-bottom: 26px;
+}
+.admin-hours-summary-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 170px;
+  padding: 22px 20px 18px;
+  border-radius: 14px;
+  border: 1px solid rgba(26, 43, 64, 0.1);
+  background: linear-gradient(180deg, rgba(17, 31, 45, 0.95), rgba(27, 44, 62, 0.95));
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+}
+.admin-hours-summary-card span {
+  color: rgba(228, 235, 240, 0.8);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.admin-hours-summary-card strong {
+  margin-top: auto;
+  font-size: clamp(24px, 2.6vw, 42px);
+  letter-spacing: -0.05em;
+  color: #fff;
+  line-height: 1.05;
+}
+.admin-hours-summary-card strong.is-alert {
+  color: #ff4d4d;
+}
+.admin-hours-summary-card strong.is-ok {
+  color: #73f0a2;
+}
+.admin-hours-summary-card small {
+  margin-top: 12px;
+  color: rgba(227, 235, 240, 0.72);
+  font-size: 12px;
+}
+.admin-hours-form {
+  margin-bottom: 22px;
+  padding: 24px 28px 18px;
+  border: 1px solid rgba(32, 46, 65, 0.1);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(17, 29, 41, 0.98), rgba(17, 29, 41, 0.98));
+  box-shadow: 0 10px 28px rgba(23,43,59,.12);
+}
+.admin-hours-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 185px), 1fr));
+  gap: 16px;
+}
 .admin-hours-fields .admin-field { min-width: 0; margin-top: 0; }
-.admin-hours-calculation { display: grid; grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr) 24px minmax(0, 1.3fr); align-items: center; gap: 10px; margin-top: 22px; padding: 17px 20px; border: 1px solid #e3ecec; border-radius: 8px; background: linear-gradient(115deg, #f5f9f9, #f0f6f5); }
+.admin-hours-fields .admin-field span {
+  color: rgba(232, 239, 242, 0.9);
+  font-weight: 600;
+}
+.admin-hours-fields .admin-field input,
+.admin-hours-fields .admin-field select {
+  background: rgba(255, 255, 255, 0.98);
+  border-color: rgba(145, 164, 179, 0.38);
+  color: #12202d;
+  min-height: 42px;
+}
+.admin-hours-calculation { display: grid; grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr) 24px minmax(0, 1.3fr); align-items: center; gap: 10px; margin-top: 22px; padding: 17px 20px; border: 1px solid rgba(131, 148, 160, 0.35); border-radius: 8px; background: rgba(255, 255, 255, 0.03); }
 .admin-hours-calculation > div { min-width: 0; }
 .admin-hours-calculation > div > span, .admin-hours-calculation > div > strong { display: block; }
-.admin-hours-calculation > div > span { color: #71818a; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
-.admin-hours-calculation > div > strong { margin-top: 5px; color: var(--admin-ink); font-size: clamp(15px, 2vw, 20px); font-variant-numeric: tabular-nums; }
-.admin-hours-calculation-operator { color: #8b9aa0; font-size: 19px; text-align: center; }
-.admin-hours-calculation .admin-hours-net { padding-left: 17px; border-left: 1px solid #d8e4e3; }
-.admin-hours-calculation .admin-hours-net > span { color: var(--admin-teal); }
-.admin-hours-calculation .admin-hours-net > strong { color: #126c6a; font-size: clamp(17px, 2.2vw, 23px); }
-.admin-hours-hint { margin: 9px 0 0; color: var(--admin-muted); font-size: 11px; }
+.admin-hours-calculation > div > span { color: rgba(228, 235, 240, 0.75); font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.admin-hours-calculation > div > strong { margin-top: 5px; color: #f5f7f8; font-size: clamp(15px, 2vw, 20px); font-variant-numeric: tabular-nums; }
+.admin-hours-calculation-operator { color: rgba(245, 247, 248, 0.8); font-size: 19px; text-align: center; }
+.admin-hours-calculation .admin-hours-net { padding-left: 17px; border-left: 1px solid rgba(136, 155, 167, 0.45); }
+.admin-hours-calculation .admin-hours-net > span { color: #c2d0ff; }
+.admin-hours-calculation .admin-hours-net > strong { color: #fff; font-size: clamp(17px, 2.2vw, 23px); }
+.admin-hours-hint { margin: 9px 0 0; color: rgba(230, 237, 242, 0.75); font-size: 11px; }
 .admin-hours-form-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 18px; }
 .admin-hours-filter { display: flex; align-items: flex-end; gap: 10px; }
 .admin-hours-filter .admin-field { min-width: 185px; margin: 0; }

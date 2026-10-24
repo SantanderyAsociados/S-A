@@ -709,6 +709,11 @@ function HoursView({ canCreate, isAdmin }) {
     proyecto: "",
   });
   const resumenJornada = calcularJornada(form.hora_entrada, form.hora_salida);
+  const user = JSON.parse(localStorage.getItem("sya_admin_user") || "null");
+  const totalWorkedMinutes = records.reduce((total, record) => total + minutosTrabajados(record), 0);
+  const targetMinutes = 175 * 60;
+  const estimatedValue = Math.round((totalWorkedMinutes / 60) * 35000);
+  const compliance = Math.min(100, Math.round((totalWorkedMinutes / targetMinutes) * 100));
 
   useEffect(() => {
     let active = true;
@@ -841,7 +846,7 @@ function HoursView({ canCreate, isAdmin }) {
 
   return (
     <>
-      <div className="admin-page-heading">
+      <div className="admin-page-heading admin-hours-page-heading">
         <div>
           <span className="admin-eyebrow">{isAdmin ? "CONTROL DE JORNADAS" : "MI JORNADA"}</span>
           <h1>Registro de horas</h1>
@@ -853,6 +858,35 @@ function HoursView({ canCreate, isAdmin }) {
           <button type="button" className="admin-secondary-button" onClick={() => { setLoading(true); setRefreshVersion((current) => current + 1); }} disabled={loading}><RefreshCw size={15} /> Actualizar</button>
         </div>}
       </div>
+
+      <div className="admin-hours-hero">
+        <div className="admin-hours-hero-head">
+          <div>
+            <span className="admin-hours-hero-label">Bienvenido</span>
+            <strong>{user?.username || "admin"}</strong>
+          </div>
+          <button type="button" className="admin-hours-hero-button">Cerrar</button>
+        </div>
+      </div>
+
+      <div className="admin-hours-summary">
+        <div className="admin-hours-summary-card">
+          <span>Horas totales</span>
+          <strong>{formatoDuracion(totalWorkedMinutes)}</strong>
+          <small>Meta mensual: 175 h</small>
+        </div>
+        <div className="admin-hours-summary-card">
+          <span>Liquidación proyectada</span>
+          <strong>$ {estimatedValue.toLocaleString("es-CO")}</strong>
+          <small>Incluye cargos dom/fest</small>
+        </div>
+        <div className="admin-hours-summary-card">
+          <span>Cumplimiento</span>
+          <strong className={compliance >= 100 ? "is-ok" : "is-alert"}>{compliance}%</strong>
+          <small>Meta del periodo</small>
+        </div>
+      </div>
+
       <datalist id="admin-hour-projects">
         {projectNames.map((name) => <option key={name} value={name} />)}
       </datalist>
