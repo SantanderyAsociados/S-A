@@ -13,7 +13,7 @@ Sitio web institucional y sistema administrativo de **S&A Santander y Asociados*
 - **Contacto:** datos de contacto y formulario para enviar solicitudes.
 - **Login:** acceso al área administrativa.
 - **Admin:** listado de mensajes, contador de estados, actualización, marcado como leído y eliminación.
-- **Panel administrativo:** dashboard, proyectos, servicios, Blog/Noticias, slider principal, clientes, galería de experiencia, mensajes, usuarios y configuración.
+- **Panel administrativo:** dashboard, proyectos, servicios, Blog/Noticias, slider principal, clientes, galería de experiencia, registro de horas, mensajes, usuarios y configuración.
 
 ## Tecnologías
 
@@ -55,7 +55,9 @@ La tabla `contenido` utiliza el campo `tipo` para separar:
 - `experiencia`
 - `slider`
 
-Los mensajes se guardan en `mensajes`, los accesos en `admin_users` (contraseñas cifradas con bcrypt) y los ajustes generales del sitio, Google Analytics y SEO en `configuracion`.
+Los mensajes se guardan en `mensajes`, los accesos en `admin_users` (contraseñas cifradas con bcrypt), los registros de jornada en `registros_horas` y los ajustes generales del sitio, Google Analytics y SEO en `configuracion`.
+
+La tabla `registros_horas` almacena fecha, hora de entrada, hora de salida, cliente, proyecto y el usuario que hizo el registro. El backend crea la tabla automáticamente al iniciar y también está declarada en [Backend/data/schema.sql](Backend/data/schema.sql).
 
 ### Carga inicial
 
@@ -262,12 +264,12 @@ Permisos actuales:
 | Rol | Permisos |
 | --- | --- |
 | Administrador | Acceso completo, usuarios, configuración del sitio, contenido, publicación y mensajes |
-| Editor | Crear, editar, publicar y eliminar contenido; gestionar mensajes |
+| Editor (Trabajador) | Registrar y consultar sus propias horas |
 | Autor | Crear, editar y publicar contenido; no elimina |
 | Colaborador | Crear contenido como borrador; no edita ni elimina |
 | Suscriptor | Consulta básica; sin acciones de edición |
 
-La matriz se aplica en el frontend para ocultar acciones y en el backend para bloquear solicitudes no autorizadas.
+El administrador puede consultar los registros de todos los trabajadores; cada Editor, presentado en el panel como **Trabajador**, solo puede registrar y consultar sus propias horas. La matriz se aplica en el frontend y en el backend para bloquear solicitudes no autorizadas.
 
 ## API principal
 
@@ -300,11 +302,15 @@ GET    /api/admin/usuarios
 POST   /api/admin/usuarios
 PATCH  /api/admin/usuarios/:id
 DELETE /api/admin/usuarios/:id
+
+GET    /api/admin/registros-horas
+POST   /api/admin/registros-horas
 ```
 
 Las utilidades cliente centralizan la comunicación:
 - [src/utils/contentApi.js](src/utils/contentApi.js) para contenido.
 - [src/utils/usersApi.js](src/utils/usersApi.js) para usuarios y roles.
+- [src/utils/horasApi.js](src/utils/horasApi.js) para el registro de horas.
 - [src/utils/configApi.js](src/utils/configApi.js) para configuración del sitio, analítica y SEO.
 
 ## Ejecutar el proyecto

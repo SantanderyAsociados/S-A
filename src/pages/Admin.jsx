@@ -7,6 +7,7 @@ import {
   BriefcaseBusiness,
   CheckCircle,
   ChevronRight,
+  Clock3,
   FileText,
   FolderKanban,
   GalleryHorizontalEnd,
@@ -29,6 +30,7 @@ import proyectos from "../data/proyectos";
 import servicios from "../data/servicios";
 import { createContent, deleteContent, getAdminContent, resolveImageUrl, updateContent } from "../utils/contentApi";
 import { createUser, deleteUser, getUsers, updateUserRole } from "../utils/usersApi";
+import { createHourRecord, getHourRecords } from "../utils/horasApi";
 import { getAdminConfig, updateAdminConfig } from "../utils/configApi";
 import "../styles/admin.css";
 
@@ -45,19 +47,28 @@ const menuItems = [
   { id: "experiencia", label: "Galería experiencia", icon: GalleryHorizontalEnd },
   { id: "mensajes", label: "Mensajes", icon: MessageSquare },
   { id: "usuarios", label: "Usuarios", icon: Users },
+  { id: "horas", label: "Registro de horas", icon: Clock3 },
 ];
 
 const ROLE_PERMISSIONS = {
-  Administrador: ["content.create", "content.edit", "content.publish", "content.delete", "messages.manage", "users.manage", "settings.manage"],
-  Editor: ["content.create", "content.edit", "content.publish", "content.delete", "messages.manage"],
+  Administrador: ["content.create", "content.edit", "content.publish", "content.delete", "messages.manage", "users.manage", "settings.manage", "hours.read", "hours.create"],
+  Trabajador: ["hours.read", "hours.create"],
   Autor: ["content.create", "content.edit", "content.publish"],
   Colaborador: ["content.create"],
   Suscriptor: [],
 };
 
+function mostrarRol(role) {
+  if (role === "admin" || role === "Administrador") return "Administrador";
+  if (role === "Editor") return "Trabajador";
+  return role || "Suscriptor";
+}
+
 function Admin() {
   const navigate = useNavigate();
-  const [activeView, setActiveView] = useState("resumen");
+  const user = JSON.parse(localStorage.getItem("sya_admin_user") || "null");
+  const role = mostrarRol(user?.role);
+  const [activeView, setActiveView] = useState(role === "Trabajador" ? "horas" : "resumen");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mensajes, setMensajes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -72,13 +83,11 @@ function Admin() {
     clientes: clientes.length,
     equipo: 0,
   });
-  const user = JSON.parse(localStorage.getItem("sya_admin_user") || "null");
-  const role = (!user?.role || user?.role === "admin" || user?.role === "Administrador")
-    ? "Administrador"
-    : user.role;
-  const permissions = ROLE_PERMISSIONS[role] || ROLE_PERMISSIONS.Administrador;
+  const permissions = ROLE_PERMISSIONS[role] || [];
   const can = (permission) => permissions.includes(permission);
   const visibleMenuItems = menuItems.filter((item) => {
+    if (role === "Trabajador") return item.id === "horas";
+    if (item.id === "horas") return can("hours.read");
     if (item.id === "usuarios" || item.id === "configuracion") return can("users.manage");
     if (item.id === "mensajes") return role !== "Suscriptor";
     if (["slider", "experiencia"].includes(item.id)) return can("content.create");
@@ -91,19 +100,21 @@ function Admin() {
       return;
     }
 
-    cargarMensajes();
-    Promise.all(["proyectos", "servicios", "noticias", "clientes", "equipo"].map((type) => getAdminContent(type)))
-      .then(([projectItems, serviceItems, newsItems, clientItems, equipoItems]) => {
-        setContentCounts({
-          proyectos: projectItems.length,
-          servicios: serviceItems.length,
-          noticias: newsItems.length,
-          clientes: clientItems.length,
-          equipo: equipoItems.length,
-        });
-      })
-      .catch(() => {});
-  }, [navigate]);
+    if (permissions.includes("messages.manage")) cargarMensajes();
+    if (permissions.includes("content.create")) {
+      Promise.all(["proyectos", "servicios", "noticias", "clientes", "equipo"].map((type) => getAdminContent(type)))
+        .then(([projectItems, serviceItems, newsItems, clientItems, equipoItems]) => {
+          setContentCounts({
+            proyectos: projectItems.length,
+            servicios: serviceItems.length,
+            noticias: newsItems.length,
+            clientes: clientItems.length,
+            equipo: equipoItems.length,
+          });
+        })
+        .catch((error) => console.error("No se pudo cargar el resumen del contenido:", error));
+    }
+  }, [navigate, role]);
 
   useEffect(() => {
     if (sidebarOpen) {
@@ -312,7 +323,10 @@ function Admin() {
             />
           )}
           {activeView === "usuarios" && <UsersView currentUserId={user?.id} />}
-          {activeView !== "resumen" && activeView !== "mensajes" && (
+          {activeView === "horas" && (
+            <HoursView canCreate={can("hours.create")} isAdmin={role === "Administrador"} />
+          )}
+          {activeView !== "resumen" && activeView !== "mensajes" && activeView !== "horas" && (
             activeView !== "usuarios" && (activeView === "configuracion" ? <SettingsView /> : activeView === "slider" ? <SliderView /> : <ContentView
                 view={activeView}
                 items={activeView === "proyectos" ? proyectos : activeView === "servicios" ? servicios : activeView === "noticias" ? noticias : activeView === "clientes" ? clientes : []}
@@ -593,12 +607,177 @@ function UsersView({ currentUserId }) {
         <div className="admin-user-fields">
           <label className="admin-field"><span>Nombre de usuario</span><input value={form.username} onChange={(event) => setForm({ ...form, username: event.target.value })} minLength="3" required /></label>
           <label className="admin-field"><span>Contraseña</span><input type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} minLength="6" required /></label>
-          <label className="admin-field"><span>Rol</span><select value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })}>{roles.map((role) => <option key={role}>{role}</option>)}</select></label>
+          <label className="admin-field"><span>Rol</span><select value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })}>{roles.map((role) => <option key={role} value={role}>{mostrarRol(role)}</option>)}</select></label>
         </div>
         <div className="admin-editor-actions"><button type="button" className="admin-secondary-button" onClick={() => setFormOpen(false)}>Cancelar</button><button type="submit" className="admin-primary-button">Crear usuario</button></div>
       </form>}
 
-      {loading ? <div className="admin-empty-state"><RefreshCw className="admin-spin" size={24} /><p>Cargando usuarios...</p></div> : <div className="admin-users-table"><div className="admin-users-header"><span>Usuario</span><span>Rol asignado</span><span>Creado</span><span>Acciones</span></div>{users.map((user) => <div className="admin-user-row" key={user.id}><div className="admin-user-name"><span>{user.username.slice(0, 2).toUpperCase()}</span><strong>{user.username}{user.id === currentUserId && <small>Tu cuenta</small>}</strong></div><select value={user.role === "admin" ? "Administrador" : user.role} onChange={(event) => changeRole(user.id, event.target.value)} disabled={user.id === currentUserId && user.role === "admin"}>{roles.map((role) => <option key={role}>{role}</option>)}</select><time>{new Date(user.created_at).toLocaleDateString("es-CO")}</time><button className="admin-row-action admin-row-delete" onClick={() => remove(user)} disabled={user.id === currentUserId}>Eliminar</button></div>)}</div>}
+      {loading ? <div className="admin-empty-state"><RefreshCw className="admin-spin" size={24} /><p>Cargando usuarios...</p></div> : <div className="admin-users-table"><div className="admin-users-header"><span>Usuario</span><span>Rol asignado</span><span>Creado</span><span>Acciones</span></div>{users.map((user) => <div className="admin-user-row" key={user.id}><div className="admin-user-name"><span>{user.username.slice(0, 2).toUpperCase()}</span><strong>{user.username}{user.id === currentUserId && <small>Tu cuenta</small>}</strong></div><select value={user.role === "admin" ? "Administrador" : user.role} onChange={(event) => changeRole(user.id, event.target.value)} disabled={user.id === currentUserId && user.role === "admin"}>{roles.map((role) => <option key={role} value={role}>{mostrarRol(role)}</option>)}</select><time>{new Date(user.created_at).toLocaleDateString("es-CO")}</time><button className="admin-row-action admin-row-delete" onClick={() => remove(user)} disabled={user.id === currentUserId}>Eliminar</button></div>)}</div>}
+    </>
+  );
+}
+
+function fechaLocalActual() {
+  const hoy = new Date();
+  const year = hoy.getFullYear();
+  const month = String(hoy.getMonth() + 1).padStart(2, "0");
+  const day = String(hoy.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function HoursView({ canCreate, isAdmin }) {
+  const [records, setRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [form, setForm] = useState({
+    fecha: fechaLocalActual(),
+    hora_entrada: "",
+    hora_salida: "",
+    cliente: "",
+    proyecto: "",
+  });
+
+  const loadRecords = async () => {
+    try {
+      const data = await getHourRecords();
+      setRecords(data);
+      setError("");
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let active = true;
+    getHourRecords()
+      .then((data) => {
+        if (active) {
+          setRecords(data);
+          setError("");
+        }
+      })
+      .catch((requestError) => {
+        if (active) setError(requestError.message);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const saveRecord = async (event) => {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    setSuccess("");
+    try {
+      const record = await createHourRecord(form);
+      setRecords((current) => [record, ...current].sort((a, b) => (
+        b.fecha.localeCompare(a.fecha)
+        || b.hora_entrada.localeCompare(a.hora_entrada)
+      )));
+      setForm((current) => ({
+        ...current,
+        hora_entrada: "",
+        hora_salida: "",
+        cliente: "",
+        proyecto: "",
+      }));
+      setSuccess("Registro guardado correctamente.");
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="admin-page-heading">
+        <div>
+          <span className="admin-eyebrow">{isAdmin ? "CONTROL DE JORNADAS" : "MI JORNADA"}</span>
+          <h1>Registro de horas</h1>
+          <p>{isAdmin ? "Consulta los registros de todos los trabajadores y agrega registros." : "Registra tu hora de entrada y salida, cliente y proyecto."}</p>
+        </div>
+        <button type="button" className="admin-secondary-button" onClick={() => { setLoading(true); loadRecords(); }} disabled={loading}>
+          <RefreshCw size={16} /> Actualizar
+        </button>
+      </div>
+
+      {canCreate && (
+        <form className="admin-user-form admin-hours-form" onSubmit={saveRecord}>
+          <div className="admin-hours-fields">
+            <label className="admin-field">
+              <span>Fecha</span>
+              <input type="date" value={form.fecha} onChange={(event) => setForm({ ...form, fecha: event.target.value })} required />
+            </label>
+            <label className="admin-field">
+              <span>Hora de entrada</span>
+              <input type="time" value={form.hora_entrada} onChange={(event) => setForm({ ...form, hora_entrada: event.target.value })} required />
+            </label>
+            <label className="admin-field">
+              <span>Hora de salida</span>
+              <input type="time" value={form.hora_salida} onChange={(event) => setForm({ ...form, hora_salida: event.target.value })} required />
+            </label>
+            <label className="admin-field">
+              <span>Cliente</span>
+              <input value={form.cliente} onChange={(event) => setForm({ ...form, cliente: event.target.value })} maxLength="180" required />
+            </label>
+            <label className="admin-field">
+              <span>Proyecto</span>
+              <input value={form.proyecto} onChange={(event) => setForm({ ...form, proyecto: event.target.value })} maxLength="180" required />
+            </label>
+          </div>
+          <div className="admin-hours-form-footer">
+            {success && <p className="admin-hours-success" role="status">{success}</p>}
+            {error && <p className="admin-hours-error" role="alert">{error}</p>}
+            <button type="submit" className="admin-primary-button" disabled={saving}>
+              {saving ? "Guardando..." : "Guardar registro"}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {error && !canCreate && <p className="admin-hours-error" role="alert">{error}</p>}
+      {loading ? (
+        <div className="admin-empty-state"><RefreshCw className="admin-spin" size={24} /><p>Cargando registros...</p></div>
+      ) : records.length === 0 ? (
+        <div className="admin-empty-state"><span><Clock3 size={26} /></span><h2>No hay registros</h2><p>Los registros de horas guardados aparecerán aquí.</p></div>
+      ) : (
+        <div className="admin-hours-table-scroll">
+          <table className="admin-hours-table">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                {isAdmin && <th>Trabajador</th>}
+                <th>Hora de entrada</th>
+                <th>Hora de salida</th>
+                <th>Cliente</th>
+                <th>Proyecto</th>
+              </tr>
+            </thead>
+            <tbody>
+              {records.map((record) => (
+                <tr key={record.id}>
+                  <td>{new Date(`${record.fecha}T00:00:00`).toLocaleDateString("es-CO")}</td>
+                  {isAdmin && <td>{record.username}</td>}
+                  <td>{record.hora_entrada}</td>
+                  <td>{record.hora_salida}</td>
+                  <td>{record.cliente}</td>
+                  <td>{record.proyecto}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </>
   );
 }
