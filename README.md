@@ -264,12 +264,14 @@ Permisos actuales:
 | Rol | Permisos |
 | --- | --- |
 | Administrador | Acceso completo, usuarios, configuración del sitio, contenido, publicación y mensajes |
-| Editor (Trabajador) | Agregar sus registros de horas; no puede consultarlos, editarlos ni eliminarlos |
+| Editor (Trabajador) | Consultar únicamente sus registros y sueldo; agregar registros propios; no puede consultar ni modificar jornadas ajenas |
 | Autor | Crear, editar y publicar contenido; no elimina |
 | Colaborador | Crear contenido como borrador; no edita ni elimina |
 | Suscriptor | Consulta básica; sin acciones de edición |
 
-El administrador puede consultar, filtrar por fecha, editar y eliminar los registros de todos los trabajadores. Cada jornada compara su tiempo real (salida menos entrada) con el estimado ingresado y muestra si se cumplió. El administrador también puede actualizar el sueldo mensual de cada usuario. Cada Editor, presentado en el panel como **Trabajador**, solo puede agregar sus horas; el servidor bloquea cualquier consulta o modificación de sus registros. El campo de proyecto ofrece sugerencias del catálogo publicado y permite escribir un nombre libre.
+El administrador puede filtrar por periodo de nómina, trabajador y fecha exacta; consultar el total de horas, la liquidación proyectada, el cumplimiento, el resumen por persona y la inversión por proyecto; además puede editar o eliminar cualquier registro. El trabajador selecciona el mes y solo consulta sus propias jornadas; no tiene controles de edición o eliminación. La API limita esa consulta al ID autenticado y protege los endpoints de edición y eliminación para que solo los administradores puedan usarlos.
+
+El formulario ofrece los proyectos y clientes de referencia en [src/data/horasCatalogos.js](src/data/horasCatalogos.js), e incluye los tipos Normal, Sábado, Domingo, Festivo y Vacaciones. Las jornadas normales descuentan una hora de almuerzo. Las vacaciones registran 9 horas en días hábiles y no se permiten en fines de semana; un festivo registra 0 horas. El salario por hora se calcula como sueldo mensual / 175; domingos (por tipo o por fecha) aplican factor 1,75, mientras los demás tipos pagables usan el valor base. El backend valida y calcula las horas, sin confiar en valores de pago enviados por el navegador.
 
 ## API principal
 
@@ -304,12 +306,13 @@ PATCH  /api/admin/usuarios/:id
 DELETE /api/admin/usuarios/:id
 
 GET    /api/admin/registros-horas
+GET    /api/admin/registros-horas/mios
 POST   /api/admin/registros-horas
 PATCH  /api/admin/registros-horas/:id
 DELETE /api/admin/registros-horas/:id
 ```
 
-La consulta de registros acepta `?fecha=AAAA-MM-DD` para filtrar una jornada desde el panel. El tiempo trabajado se calcula automáticamente a partir de la hora de entrada y salida, descontando una hora de almuerzo; no se pide ingresar un estimado manual. El resumen muestra la duración total, el descuento y las horas netas, y los registros se presentan como tarjetas adaptables en pantallas estrechas.
+La consulta administrativa admite `?mes=AAAA-MM` y `?fecha=AAAA-MM-DD`; el endpoint `/mios` recibe `?mes=AAAA-MM` y responde solo con registros y sueldo del usuario autenticado. Las columnas `tipo` y `numero_proyecto` se crean automáticamente para instalaciones existentes y también están declaradas en [Backend/data/schema.sql](../Backend/data/schema.sql). El listado de jornadas se adapta a tarjetas en pantallas estrechas.
 
 Las utilidades cliente centralizan la comunicación:
 - [src/utils/contentApi.js](src/utils/contentApi.js) para contenido.

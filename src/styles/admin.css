@@ -168,16 +168,14 @@
   font-size: clamp(20px, 2vw, 34px);
   letter-spacing: -0.04em;
 }
-.admin-hours-hero-button {
-  border: 0;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.14);
+.admin-hours-role-badge {
+  padding: 9px 13px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
   color: #fff;
-  padding: 10px 18px;
-  font: inherit;
-  font-size: 12px;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 11px;
   font-weight: 700;
-  cursor: pointer;
 }
 .admin-hours-summary {
   display: grid;
@@ -220,6 +218,22 @@
   color: rgba(227, 235, 240, 0.72);
   font-size: 12px;
 }
+.admin-hours-progress {
+  height: 7px;
+  margin-top: auto;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(226, 235, 241, 0.16);
+}
+.admin-hours-progress i {
+  height: 100%;
+  display: block;
+  border-radius: inherit;
+  background: #7567f5;
+  transition: width .25s ease;
+}
+.admin-hours-summary-card small + .admin-hours-progress { margin-top: 12px; }
+.admin-hours-summary-card .admin-hours-progress + small { margin-top: 8px; }
 .admin-hours-form {
   margin-bottom: 22px;
   padding: 24px 28px 18px;
@@ -257,7 +271,28 @@
 .admin-hours-hint { margin: 9px 0 0; color: rgba(230, 237, 242, 0.75); font-size: 11px; }
 .admin-hours-form-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 18px; }
 .admin-hours-filter { display: flex; align-items: flex-end; gap: 10px; }
-.admin-hours-filter .admin-field { min-width: 185px; margin: 0; }
+.admin-hours-filter .admin-field { min-width: 165px; margin: 0; }
+.admin-hours-filter .admin-field input,
+.admin-hours-filter .admin-field select,
+.admin-hour-edit-form .admin-field select {
+  width: 100%;
+  min-height: 39px;
+  padding: 0 10px;
+  border: 1px solid var(--admin-line);
+  border-radius: 3px;
+  color: var(--admin-ink);
+  background: #fbfcfc;
+  font: inherit;
+  font-size: 12px;
+}
+.admin-hours-search { margin: 0 0 18px; }
+.admin-hours-search .admin-field { width: min(440px, 100%); }
+.admin-hours-search input { min-height: 39px; padding: 0 11px; border: 1px solid var(--admin-line); border-radius: 3px; font: inherit; }
+.admin-hours-analytics { margin: 0 0 24px; padding: 22px; border: 1px solid var(--admin-line); border-radius: 8px; background: #fff; }
+.admin-hours-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 16px; }
+.admin-hours-section-heading h2 { margin: 6px 0 0; color: var(--admin-ink); font-size: 18px; letter-spacing: -.02em; }
+.admin-hours-report-table { min-width: 720px; }
+.admin-hours-analytics .admin-hours-table-scroll { border-radius: 5px; }
 .admin-hour-edit-form { display: grid; grid-template-columns: repeat(3, minmax(150px, 1fr)); align-items: end; gap: 12px; }
 .admin-hour-edit-form .admin-field { min-width: 0; margin: 0; }
 .admin-hour-edit-form .admin-editor-actions { grid-column: 1 / -1; margin-top: 0; }
@@ -265,7 +300,7 @@
 .admin-hours-success { color: #21817a; }
 .admin-hours-error { margin-bottom: 14px; color: var(--admin-red); }
 .admin-hours-table-scroll { overflow-x: auto; border: 1px solid var(--admin-line); border-radius: 5px; background: var(--admin-surface); }
-.admin-hours-table { width: 100%; min-width: 940px; border-collapse: collapse; text-align: left; }
+.admin-hours-table { width: 100%; min-width: 1160px; border-collapse: collapse; text-align: left; }
 .admin-hours-table th, .admin-hours-table td { padding: 14px 16px; border-bottom: 1px solid #eef1f2; font-size: 12px; }
 .admin-hours-table th { color: var(--admin-muted); background: #f7f9f9; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
 .admin-hours-table tbody tr:last-child td { border-bottom: 0; }
@@ -394,6 +429,9 @@
   .admin-topbar { padding: 0 28px; }
   .admin-content { padding-inline: 28px; }
   .admin-stat-grid { grid-template-columns: repeat(2, 1fr); }
+  .admin-hours-summary { gap: 12px; }
+  .admin-hours-summary-card { padding-inline: 16px; }
+  .admin-hours-analytics { padding: 18px; }
   .admin-hours-table-scroll { overflow: visible; border: 0; background: transparent; }
   .admin-hours-table { display: block; min-width: 0; }
   .admin-hours-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); }
@@ -630,8 +668,30 @@
     flex-direction: column;
     align-items: stretch;
   }
+  .admin-hours-filter > button {
+    width: 100%;
+    min-height: 42px;
+  }
   .admin-hours-filter .admin-field {
     min-width: 0;
+  }
+  .admin-hours-summary {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .admin-hours-summary-card {
+    min-height: 138px;
+  }
+  .admin-hours-analytics {
+    padding: 15px 12px;
+    margin-bottom: 18px;
+  }
+  .admin-hours-section-heading h2 {
+    font-size: 16px;
+  }
+  .admin-hours-search .admin-field {
+    width: 100%;
   }
   .admin-hour-edit-form {
     grid-template-columns: 1fr;

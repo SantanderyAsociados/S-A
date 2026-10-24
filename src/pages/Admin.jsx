@@ -28,10 +28,11 @@ import clientes from "../data/clientes";
 import noticias from "../data/noticias";
 import proyectos from "../data/proyectos";
 import servicios from "../data/servicios";
-import { createContent, deleteContent, getAdminContent, getPublicContent, resolveImageUrl, updateContent } from "../utils/contentApi";
+import { createContent, deleteContent, getAdminContent, resolveImageUrl, updateContent } from "../utils/contentApi";
 import { createUser, deleteUser, getUsers, updateUser } from "../utils/usersApi";
-import { createHourRecord, deleteHourRecord, getHourRecords, updateHourRecord } from "../utils/horasApi";
+import { createHourRecord, deleteHourRecord, getHourRecords, getMyHourRecords, updateHourRecord } from "../utils/horasApi";
 import { getAdminConfig, updateAdminConfig } from "../utils/configApi";
+import { clientOptions, projectOptions } from "../data/horasCatalogos";
 import "../styles/admin.css";
 
 const HERO_FALLBACK_IMAGE = "/images/Fotos/Puentes/Puente Sisga - BTS.jfif";
@@ -685,10 +686,14 @@ function calcularJornada(horaEntrada, horaSalida) {
 }
 
 function minutosTrabajados(record) {
+  if (Number.isFinite(Number(record.tiempo_estimado))) {
+    return Math.round(Number(record.tiempo_estimado) * 60);
+  }
   return calcularJornada(record.hora_entrada, record.hora_salida)?.workedMinutes || 0;
 }
 
 function formatoDuracion(minutes) {
+  if (!minutes) return "0 h";
   const hours = Math.floor(minutes / 60);
   const remainingMinutes = minutes % 60;
   if (hours && remainingMinutes) return `${hours} h ${remainingMinutes} min`;
@@ -696,62 +701,147 @@ function formatoDuracion(minutes) {
   return `${remainingMinutes} min`;
 }
 
+function calcularHorasFormulario(form) {
+  if (!form.fecha) return null;
+  if (form.tipo === "festivo") return { totalMinutes: 0, workedMinutes: 0 };
+  if (form.tipo === "vacaciones") {
+    const [year, month, day] = form.fecha.split("-").map(Number);
+    const weekday = new Date(year, month - 1, day).getDay();
+    return weekday === 0 || weekday === 6
+      ? { totalMinutes: 0, workedMinutes: 0 }
+      : { totalMinutes: 540, workedMinutes: 540 };
+  }
+  return calcularJornada(form.hora_entrada, form.hora_salida);
+}
+
+function costoRegistro(record, fallbackSalary = 0) {
+  if (Number.isFinite(Number(record.pago))) return Number(record.pago);
+  const hours = minutosTrabajados(record) / 60;
+  if (record.tipo === "festivo") return 0;
+  const salary = Number(record.monthly_salary ?? fallbackSalary) || 0;
+  const [year, month, day] = String(record.fecha).slice(0, 10).split("-").map(Number);
+  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  const isSunday = record.tipo === "domingo" || weekday === 0;
+  return hours * (salary / 175) * (isSunday ? 1.75 : 1);
+}
+
 function HoursView({ canCreate, isAdmin }) {
   const [records, setRecords] = useState([]);
-  const [loading, setLoading] = useState(isAdmin);
+  const [workers, setWorkers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedMonth, setSelectedMonth] = useState(fechaMesActual());
+  const [selectedWorkerId, setSelectedWorkerId] = useState("");
+  const [search, setSearch] = useState("");
   const [refreshVersion, setRefreshVersion] = useState(0);
-  const [projectNames, setProjectNames] = useState([]);
-  const [projectLoadError, setProjectLoadError] = useState("");
+  const [monthlySalary, setMonthlySalary] = useState(0);
+  const [workersError, setWorkersError] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState(null);
   const [form, setForm] = useState({
     fecha: fechaLocalActual(),
     hora_entrada: "",
     hora_salida: "",
+    tipo: "normal",
+    numero_proyecto: "",
     cliente: "",
     proyecto: "",
   });
-  const resumenJornada = calcularJornada(form.hora_entrada, form.hora_salida);
+  const resumenJornada = calcularHorasFormulario(form);
   const user = JSON.parse(localStorage.getItem("sya_admin_user") || "null");
-  const visibleRecords = records.filter((record) => {
-    const matchesMonth = !selectedMonth || record.fecha.startsWith(selectedMonth);
+  const workersForMonth = isAdmin
+    ? workers.filter((worker) => worker.role === "Editor" || worker.role === "Trabajador")
+    : [];
+  const summaryRecords = records.filter((record) => (
+    !isAdmin || !selectedWorkerId || String(record.user_id) === selectedWorkerId
+  ));
+  const visibleRecords = summaryRecords.filter((record) => {
     const matchesDate = !selectedDate || record.fecha === selectedDate;
-    return matchesMonth && matchesDate;
+    const query = search.trim().toLocaleLowerCase("es-CO");
+    const matchesSearch = !query || [
+      record.username,
+      record.cliente,
+      record.proyecto,
+      record.numero_proyecto,
+    ].some((value) => String(value || "").toLocaleLowerCase("es-CO").includes(query));
+    return matchesDate && matchesSearch;
   });
-  const totalWorkedMinutes = visibleRecords.reduce((total, record) => total + minutosTrabajados(record), 0);
-  const targetMinutes = 175 * 60;
-  const estimatedValue = Math.round((totalWorkedMinutes / 60) * 35000);
-  const compliance = Math.min(100, Math.round((totalWorkedMinutes / targetMinutes) * 100));
+  const totalWorkedMinutes = summaryRecords.reduce((total, record) => total + minutosTrabajados(record), 0);
+  const estimatedValue = summaryRecords.reduce((total, record) => (
+    total + costoRegistro(record, monthlySalary)
+  ), 0);
+  const totalEmployees = workersForMonth.length;
+  const summariesByWorker = workersForMonth.map((worker) => {
+    const workerRecords = records.filter((record) => String(record.user_id) === String(worker.id));
+    const workedMinutes = workerRecords.reduce((total, record) => total + minutosTrabajados(record), 0);
+    const salary = Number(worker.monthly_salary) || 0;
+    const liquidation = workerRecords.reduce((total, record) => total + costoRegistro(record, salary), 0);
+    return {
+      ...worker,
+      workedMinutes,
+      liquidation,
+      compliance: Math.min(100, Math.round((workedMinutes / (175 * 60)) * 100)),
+    };
+  });
+  const compliance = isAdmin && !selectedWorkerId
+    ? (totalEmployees
+      ? Math.round((summariesByWorker.filter((worker) => worker.workedMinutes >= 175 * 60).length / totalEmployees) * 100)
+      : 0)
+    : Math.min(100, Math.round((totalWorkedMinutes / (175 * 60)) * 100));
+  const summariesForProjects = selectedWorkerId
+    ? summaryRecords
+    : records;
+  const projectSummaries = Object.values(summariesForProjects.reduce((summary, record) => {
+    if (!record.proyecto || ["Día Festivo", "Vacaciones"].includes(record.proyecto)) return summary;
+    const key = `${record.proyecto}|${record.numero_proyecto || ""}|${record.cliente || ""}`;
+    if (!summary[key]) {
+      summary[key] = {
+        proyecto: record.proyecto,
+        numero: record.numero_proyecto || "—",
+        cliente: record.cliente || "—",
+        workedMinutes: 0,
+        cost: 0,
+      };
+    }
+    summary[key].workedMinutes += minutosTrabajados(record);
+    summary[key].cost += costoRegistro(record, monthlySalary);
+    return summary;
+  }, {}));
 
   useEffect(() => {
     let active = true;
-    getPublicContent("proyectos")
+    if (!isAdmin) return () => { active = false; };
+    getUsers()
       .then((items) => {
-        if (active) setProjectNames(items.map((item) => item.titulo).filter(Boolean));
+        if (active) {
+          setWorkers(items);
+          setWorkersError("");
+        }
       })
       .catch((requestError) => {
-        if (active) setProjectLoadError(`No se pudieron cargar las sugerencias de proyectos: ${requestError.message}`);
+        if (active) setWorkersError(`No se pudo cargar la lista de trabajadores: ${requestError.message}`);
       });
 
     return () => {
       active = false;
     };
-  }, []);
+  }, [isAdmin]);
 
   useEffect(() => {
     if (!isAdmin && !canCreate) return undefined;
 
     let active = true;
-    setLoading(true);
-    getHourRecords(selectedDate, !isAdmin)
+    const loadRecords = isAdmin
+      ? getHourRecords(selectedMonth)
+      : getMyHourRecords(selectedMonth);
+    loadRecords
       .then((data) => {
         if (active) {
-          setRecords(data);
+          setRecords(isAdmin ? data : data.registros);
+          if (!isAdmin) setMonthlySalary(Number(data.sueldo_mensual) || 0);
           setError("");
         }
       })
@@ -765,13 +855,24 @@ function HoursView({ canCreate, isAdmin }) {
     return () => {
       active = false;
     };
-  }, [isAdmin, canCreate, selectedDate, refreshVersion]);
+  }, [isAdmin, canCreate, selectedMonth, refreshVersion]);
 
   const saveRecord = async (event) => {
     event.preventDefault();
-    const jornada = calcularJornada(form.hora_entrada, form.hora_salida);
-    if (!jornada || jornada.workedMinutes <= 0) {
-      setError("La salida debe ser posterior a la entrada y la jornada debe superar 1 hora para descontar el almuerzo.");
+    const jornada = calcularHorasFormulario(form);
+    const esJornadaEspecial = form.tipo === "festivo" || form.tipo === "vacaciones";
+    const fecha = new Date(`${form.fecha}T00:00:00`);
+    const esFinDeSemana = fecha.getDay() === 0 || fecha.getDay() === 6;
+    if (!jornada || (!esJornadaEspecial && jornada.workedMinutes <= 0)) {
+      setError("Verifica la fecha y las horas. La salida debe ser posterior a la entrada y la jornada debe superar una hora.");
+      return;
+    }
+    if (form.tipo === "vacaciones" && esFinDeSemana) {
+      setError("Las vacaciones solo se pueden registrar en días hábiles.");
+      return;
+    }
+    if (!esJornadaEspecial && (!form.proyecto || !form.numero_proyecto.trim() || !form.cliente)) {
+      setError("Selecciona un proyecto y un cliente e indica el número de proyecto.");
       return;
     }
 
@@ -781,11 +882,12 @@ function HoursView({ canCreate, isAdmin }) {
     try {
       const record = await createHourRecord({
         ...form,
-        tiempo_estimado: jornada.workedMinutes / 60,
+        ...(esJornadaEspecial
+          ? { hora_entrada: "", hora_salida: "", numero_proyecto: "", cliente: "", proyecto: "" }
+          : {}),
       });
       const matchesMonth = !selectedMonth || record.fecha.startsWith(selectedMonth);
-      const matchesDate = !selectedDate || selectedDate === record.fecha;
-      if (matchesMonth && matchesDate) {
+      if (matchesMonth) {
         setRecords((current) => [record, ...current].sort((a, b) => (
           b.fecha.localeCompare(a.fecha)
           || b.hora_entrada.localeCompare(a.hora_entrada)
@@ -795,6 +897,7 @@ function HoursView({ canCreate, isAdmin }) {
         ...current,
         hora_entrada: "",
         hora_salida: "",
+        numero_proyecto: "",
         cliente: "",
         proyecto: "",
       }));
@@ -807,11 +910,14 @@ function HoursView({ canCreate, isAdmin }) {
   };
 
   const startEditing = (record) => {
+    if (!isAdmin) return;
     setEditingId(record.id);
     setEditForm({
       fecha: record.fecha,
       hora_entrada: record.hora_entrada,
       hora_salida: record.hora_salida,
+      tipo: record.tipo || "normal",
+      numero_proyecto: record.numero_proyecto || "",
       cliente: record.cliente,
       proyecto: record.proyecto,
     });
@@ -820,18 +926,26 @@ function HoursView({ canCreate, isAdmin }) {
 
   const saveEdit = async (event) => {
     event.preventDefault();
-    const jornada = calcularJornada(editForm.hora_entrada, editForm.hora_salida);
-    if (!jornada || jornada.workedMinutes <= 0) {
-      setError("La salida debe ser posterior a la entrada y la jornada debe superar 1 hora para descontar el almuerzo.");
+    if (!isAdmin) {
+      setError("Solo un administrador puede editar registros de horas.");
+      return;
+    }
+    const jornada = calcularHorasFormulario(editForm);
+    const esJornadaEspecial = editForm.tipo === "festivo" || editForm.tipo === "vacaciones";
+    if (!jornada || (!esJornadaEspecial && jornada.workedMinutes <= 0)) {
+      setError("Verifica la fecha y las horas. La salida debe ser posterior a la entrada y la jornada debe superar una hora.");
+      return;
+    }
+    const [year, month, day] = editForm.fecha.split("-").map(Number);
+    const editWeekday = new Date(year, month - 1, day).getDay();
+    if (editForm.tipo === "vacaciones" && (editWeekday === 0 || editWeekday === 6)) {
+      setError("Las vacaciones solo se pueden registrar en días hábiles.");
       return;
     }
 
     setError("");
     try {
-      const updatedRecord = await updateHourRecord(editingId, {
-        ...editForm,
-        tiempo_estimado: jornada.workedMinutes / 60,
-      });
+      const updatedRecord = await updateHourRecord(editingId, editForm);
       setRecords((current) => current
         .map((record) => record.id === editingId ? updatedRecord : record)
         .filter((record) => (!selectedDate || record.fecha === selectedDate) && (!selectedMonth || record.fecha.startsWith(selectedMonth))));
@@ -843,6 +957,10 @@ function HoursView({ canCreate, isAdmin }) {
   };
 
   const removeRecord = async (record) => {
+    if (!isAdmin) {
+      setError("Solo un administrador puede eliminar registros de horas.");
+      return;
+    }
     if (!window.confirm(`¿Eliminar el registro de ${record.username} del ${record.fecha}?`)) return;
     setError("");
     try {
@@ -857,10 +975,6 @@ function HoursView({ canCreate, isAdmin }) {
     }
   };
 
-  const renderProjectField = (value, onChange, required = true) => (
-    <input list="admin-hour-projects" value={value} onChange={onChange} maxLength="180" required={required} />
-  );
-
   return (
     <>
       <div className="admin-page-heading admin-hours-page-heading">
@@ -870,11 +984,19 @@ function HoursView({ canCreate, isAdmin }) {
           <p>{isAdmin ? "Consulta por mes y revisa el rendimiento de cada trabajador." : "Selecciona el mes y revisa cuánto has trabajado."}</p>
         </div>
         <div className="admin-hours-filter">
-          <label className="admin-field"><span>Mes</span><input type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} /></label>
+          <label className="admin-field"><span>Periodo de nómina</span><input type="month" value={selectedMonth} onChange={(event) => { setLoading(true); setSelectedDate(""); setSelectedMonth(event.target.value); }} /></label>
           {isAdmin && (
-            <label className="admin-field"><span>Fecha exacta</span><input type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} /></label>
+            <>
+              <label className="admin-field"><span>Trabajador</span>
+                <select value={selectedWorkerId} onChange={(event) => setSelectedWorkerId(event.target.value)}>
+                  <option value="">Todos los trabajadores</option>
+                  {workersForMonth.map((worker) => <option key={worker.id} value={worker.id}>{worker.username}</option>)}
+                </select>
+              </label>
+              <label className="admin-field"><span>Fecha exacta</span><input type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} /></label>
+            </>
           )}
-          <button type="button" className="admin-secondary-button" onClick={() => { setLoading(true); setSelectedDate(""); setSelectedMonth(fechaMesActual()); }} disabled={loading && !selectedDate && selectedMonth === fechaMesActual()}>Ver este mes</button>
+          <button type="button" className="admin-secondary-button" onClick={() => { setSelectedDate(""); if (selectedMonth !== fechaMesActual()) { setLoading(true); setSelectedMonth(fechaMesActual()); } }} disabled={!selectedDate && selectedMonth === fechaMesActual()}>Mes actual</button>
           <button type="button" className="admin-secondary-button" onClick={() => { setLoading(true); setRefreshVersion((current) => current + 1); }} disabled={loading}><RefreshCw size={15} /> Actualizar</button>
         </div>
       </div>
@@ -885,7 +1007,7 @@ function HoursView({ canCreate, isAdmin }) {
             <span className="admin-hours-hero-label">Bienvenido</span>
             <strong>{user?.username || "admin"}</strong>
           </div>
-          <button type="button" className="admin-hours-hero-button">Cerrar</button>
+          <span className="admin-hours-role-badge">{isAdmin ? "Administrador" : "Trabajador"}</span>
         </div>
       </div>
 
@@ -893,23 +1015,20 @@ function HoursView({ canCreate, isAdmin }) {
         <div className="admin-hours-summary-card">
           <span>Horas totales</span>
           <strong>{formatoDuracion(totalWorkedMinutes)}</strong>
-          <small>Meta mensual: 175 h</small>
+          <small>{isAdmin && !selectedWorkerId ? `Meta: ${175 * totalEmployees} h para ${totalEmployees} trabajadores` : "Meta mensual: 175 h"}</small>
         </div>
         <div className="admin-hours-summary-card">
           <span>Liquidación proyectada</span>
           <strong>$ {estimatedValue.toLocaleString("es-CO")}</strong>
-          <small>Incluye cargos dom/fest</small>
+          <small>Calculada con sueldo mensual ÷ 175 h y recargo dominical</small>
         </div>
         <div className="admin-hours-summary-card">
           <span>Cumplimiento</span>
           <strong className={compliance >= 100 ? "is-ok" : "is-alert"}>{compliance}%</strong>
-          <small>Meta del periodo</small>
+          <div className="admin-hours-progress"><i style={{ width: `${compliance}%` }} /></div>
+          <small>{isAdmin && !selectedWorkerId ? "Trabajadores que cumplieron la meta" : "Avance sobre la meta de 175 h"}</small>
         </div>
       </div>
-
-      <datalist id="admin-hour-projects">
-        {projectNames.map((name) => <option key={name} value={name} />)}
-      </datalist>
 
       {canCreate && (
         <form className="admin-user-form admin-hours-form" onSubmit={saveRecord}>
@@ -919,42 +1038,131 @@ function HoursView({ canCreate, isAdmin }) {
               <input type="date" value={form.fecha} onChange={(event) => setForm({ ...form, fecha: event.target.value })} required />
             </label>
             <label className="admin-field">
+              <span>Tipo de jornada</span>
+              <select value={form.tipo} onChange={(event) => {
+                const tipo = event.target.value;
+                setForm({
+                  ...form,
+                  tipo,
+                  ...(tipo === "festivo" || tipo === "vacaciones"
+                    ? { hora_entrada: "", hora_salida: "", numero_proyecto: "", cliente: "", proyecto: "" }
+                    : {}),
+                });
+              }}>
+                <option value="normal">Normal</option>
+                <option value="sabado">Sábado</option>
+                <option value="domingo">Domingo</option>
+                <option value="festivo">Festivo</option>
+                <option value="vacaciones">Vacaciones</option>
+              </select>
+            </label>
+            <label className="admin-field">
               <span>Hora de entrada</span>
-              <input type="time" value={form.hora_entrada} onChange={(event) => setForm({ ...form, hora_entrada: event.target.value })} required />
+              <input type="time" value={form.hora_entrada} onChange={(event) => setForm({ ...form, hora_entrada: event.target.value })} required={!["festivo", "vacaciones"].includes(form.tipo)} disabled={["festivo", "vacaciones"].includes(form.tipo)} />
             </label>
             <label className="admin-field">
               <span>Hora de salida</span>
-              <input type="time" min={form.hora_entrada || undefined} value={form.hora_salida} onChange={(event) => setForm({ ...form, hora_salida: event.target.value })} required />
-            </label>
-            <label className="admin-field">
-              <span>Cliente</span>
-              <input value={form.cliente} onChange={(event) => setForm({ ...form, cliente: event.target.value })} maxLength="180" required />
+              <input type="time" min={form.hora_entrada || undefined} value={form.hora_salida} onChange={(event) => setForm({ ...form, hora_salida: event.target.value })} required={!["festivo", "vacaciones"].includes(form.tipo)} disabled={["festivo", "vacaciones"].includes(form.tipo)} />
             </label>
             <label className="admin-field">
               <span>Proyecto</span>
-              {renderProjectField(form.proyecto, (event) => setForm({ ...form, proyecto: event.target.value }))}
+              <select value={form.proyecto} onChange={(event) => setForm({ ...form, proyecto: event.target.value })} required={!["festivo", "vacaciones"].includes(form.tipo)} disabled={["festivo", "vacaciones"].includes(form.tipo)}>
+                <option value="">Seleccione un proyecto</option>
+                {form.proyecto && !projectOptions.includes(form.proyecto) && <option value={form.proyecto}>{form.proyecto}</option>}
+                {projectOptions.map((project) => <option key={project} value={project}>{project}</option>)}
+              </select>
+            </label>
+            <label className="admin-field">
+              <span>Número de proyecto</span>
+              <input value={form.numero_proyecto} onChange={(event) => setForm({ ...form, numero_proyecto: event.target.value })} maxLength="80" required={!["festivo", "vacaciones"].includes(form.tipo)} disabled={["festivo", "vacaciones"].includes(form.tipo)} />
+            </label>
+            <label className="admin-field">
+              <span>Cliente</span>
+              <select value={form.cliente} onChange={(event) => setForm({ ...form, cliente: event.target.value })} required={!["festivo", "vacaciones"].includes(form.tipo)} disabled={["festivo", "vacaciones"].includes(form.tipo)}>
+                <option value="">Seleccione un cliente</option>
+                {form.cliente && !clientOptions.includes(form.cliente) && <option value={form.cliente}>{form.cliente}</option>}
+                {clientOptions.map((client) => <option key={client} value={client}>{client}</option>)}
+              </select>
             </label>
           </div>
           <div className="admin-hours-calculation" aria-live="polite">
-            <div><span>Tiempo total</span><strong>{resumenJornada ? formatoDuracion(resumenJornada.totalMinutes) : "--"}</strong></div>
+            <div><span>{form.tipo === "vacaciones" ? "Día hábil" : form.tipo === "festivo" ? "Festivo" : "Tiempo total"}</span><strong>{resumenJornada ? formatoDuracion(resumenJornada.totalMinutes) : "--"}</strong></div>
             <span className="admin-hours-calculation-operator" aria-hidden="true">−</span>
-            <div><span>Almuerzo</span><strong>1 h</strong></div>
+            <div><span>Almuerzo</span><strong>{["festivo", "vacaciones"].includes(form.tipo) ? "—" : "1 h"}</strong></div>
             <span className="admin-hours-calculation-operator" aria-hidden="true">=</span>
-            <div className="admin-hours-net"><span>Horas trabajadas</span><strong>{resumenJornada ? formatoDuracion(resumenJornada.workedMinutes) : "--"}</strong></div>
+            <div className="admin-hours-net"><span>Horas a liquidar</span><strong>{resumenJornada ? formatoDuracion(resumenJornada.workedMinutes) : "--"}</strong></div>
           </div>
-          <p className="admin-hours-hint">El cálculo descuenta automáticamente 1 hora de almuerzo.</p>
-          {projectLoadError && <p className="admin-hours-error" role="alert">{projectLoadError}</p>}
+          <p className="admin-hours-hint">
+            {form.tipo === "vacaciones"
+              ? "Las vacaciones registran 9 horas en días hábiles; no se permiten en fines de semana."
+              : form.tipo === "festivo"
+                ? "El festivo registra 0 horas y no genera liquidación adicional."
+                : "Se descuenta 1 hora de almuerzo. El domingo aplica recargo del 75%."}
+          </p>
+          {error && <p className="admin-hours-error" role="alert">{error}</p>}
           <div className="admin-hours-form-footer">
             {success && <p className="admin-hours-success" role="status">{success}</p>}
-            {error && !isAdmin && <p className="admin-hours-error" role="alert">{error}</p>}
             <button type="submit" className="admin-primary-button" disabled={saving}>
-              {saving ? "Guardando..." : "Guardar registro"}
+              {saving ? "Guardando..." : "Agregar registro"}
             </button>
           </div>
         </form>
       )}
 
-      {error && isAdmin && <p className="admin-hours-error" role="alert">{error}</p>}
+      {isAdmin && (
+        <>
+          {workersError && <p className="admin-hours-error" role="alert">{workersError}</p>}
+          <section className="admin-hours-analytics">
+            <div className="admin-hours-section-heading">
+              <div><span className="admin-eyebrow">NÓMINA DEL PERIODO</span><h2>Resumen por trabajador</h2></div>
+            </div>
+            <div className="admin-hours-table-scroll">
+              <table className="admin-hours-table admin-hours-report-table">
+                <thead><tr><th>Trabajador</th><th>Sueldo mensual</th><th>Horas totales</th><th>Liquidación</th><th>Rendimiento</th><th>Meta (175 h)</th></tr></thead>
+                <tbody>
+                  {summariesByWorker.length ? summariesByWorker.map((worker) => (
+                    <tr key={worker.id}>
+                      <td data-label="Trabajador">{worker.username}</td>
+                      <td data-label="Sueldo mensual">{Number(worker.monthly_salary || 0).toLocaleString("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 })}</td>
+                      <td data-label="Horas totales">{formatoDuracion(worker.workedMinutes)}</td>
+                      <td data-label="Liquidación">{worker.liquidation.toLocaleString("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 })}</td>
+                      <td data-label="Rendimiento">{worker.compliance}%</td>
+                      <td data-label="Meta">{worker.workedMinutes >= 175 * 60 ? "Cumplida" : "Pendiente"}</td>
+                    </tr>
+                  )) : <tr><td colSpan="6">No hay trabajadores registrados para consultar.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section className="admin-hours-analytics">
+            <div className="admin-hours-section-heading">
+              <div><span className="admin-eyebrow">CONTROL DE COSTOS</span><h2>Análisis de inversión por proyecto</h2></div>
+            </div>
+            <div className="admin-hours-table-scroll">
+              <table className="admin-hours-table admin-hours-report-table">
+                <thead><tr><th>N.º proyecto</th><th>Proyecto</th><th>Cliente</th><th>Horas invertidas</th><th>Costo</th></tr></thead>
+                <tbody>
+                  {projectSummaries.length ? projectSummaries.map((project) => (
+                    <tr key={`${project.proyecto}|${project.numero}|${project.cliente}`}>
+                      <td data-label="N.º proyecto">{project.numero}</td>
+                      <td data-label="Proyecto">{project.proyecto}</td>
+                      <td data-label="Cliente">{project.cliente}</td>
+                      <td data-label="Horas invertidas">{formatoDuracion(project.workedMinutes)}</td>
+                      <td data-label="Costo">{project.cost.toLocaleString("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 })}</td>
+                    </tr>
+                  )) : <tr><td colSpan="5">No hay horas de proyectos registradas en este periodo.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <div className="admin-hours-filter admin-hours-search">
+            <label className="admin-field"><span>Buscar en el periodo</span><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Trabajador, proyecto, cliente o número" /></label>
+          </div>
+        </>
+      )}
+      {error && !canCreate && <p className="admin-hours-error" role="alert">{error}</p>}
       {loading ? (
         <div className="admin-empty-state"><RefreshCw className="admin-spin" size={24} /><p>Cargando registros...</p></div>
       ) : visibleRecords.length === 0 ? (
@@ -968,11 +1176,13 @@ function HoursView({ canCreate, isAdmin }) {
                 {isAdmin && <th>Trabajador</th>}
                 <th>Hora de entrada</th>
                 <th>Hora de salida</th>
+                <th>Tipo</th>
+                <th>N.º proyecto</th>
                 <th>Cliente</th>
                 <th>Proyecto</th>
                 <th>Almuerzo</th>
                 <th>Horas trabajadas</th>
-                <th>Acciones</th>
+                {isAdmin && <th>Acciones</th>}
               </tr>
             </thead>
             <tbody>
@@ -980,28 +1190,41 @@ function HoursView({ canCreate, isAdmin }) {
                 const actualMinutes = minutosTrabajados(record);
                 return (
                   <tr key={record.id}>
-                    {editingId === record.id ? (
-                      <td colSpan="9">
+                    {isAdmin && editingId === record.id ? (
+                      <td colSpan={isAdmin ? 11 : 9}>
                         <form className="admin-hour-edit-form" onSubmit={saveEdit}>
                           <label className="admin-field"><span>Fecha</span><input type="date" value={editForm.fecha} onChange={(event) => setEditForm({ ...editForm, fecha: event.target.value })} required /></label>
-                          <label className="admin-field"><span>Entrada</span><input type="time" value={editForm.hora_entrada} onChange={(event) => setEditForm({ ...editForm, hora_entrada: event.target.value })} required /></label>
-                          <label className="admin-field"><span>Salida</span><input type="time" min={editForm.hora_entrada || undefined} value={editForm.hora_salida} onChange={(event) => setEditForm({ ...editForm, hora_salida: event.target.value })} required /></label>
-                          <label className="admin-field"><span>Cliente</span><input value={editForm.cliente} onChange={(event) => setEditForm({ ...editForm, cliente: event.target.value })} maxLength="180" required /></label>
-                          <label className="admin-field"><span>Proyecto</span>{renderProjectField(editForm.proyecto, (event) => setEditForm({ ...editForm, proyecto: event.target.value }))}</label>
+                          <label className="admin-field"><span>Tipo de jornada</span><select value={editForm.tipo} onChange={(event) => {
+                            const tipo = event.target.value;
+                            setEditForm({
+                              ...editForm,
+                              tipo,
+                              ...(tipo === "festivo" || tipo === "vacaciones"
+                                ? { hora_entrada: "", hora_salida: "", numero_proyecto: "", cliente: "", proyecto: "" }
+                                : {}),
+                            });
+                          }}><option value="normal">Normal</option><option value="sabado">Sábado</option><option value="domingo">Domingo</option><option value="festivo">Festivo</option><option value="vacaciones">Vacaciones</option></select></label>
+                          <label className="admin-field"><span>Entrada</span><input type="time" value={editForm.hora_entrada} onChange={(event) => setEditForm({ ...editForm, hora_entrada: event.target.value })} required={!["festivo", "vacaciones"].includes(editForm.tipo)} disabled={["festivo", "vacaciones"].includes(editForm.tipo)} /></label>
+                          <label className="admin-field"><span>Salida</span><input type="time" min={editForm.hora_entrada || undefined} value={editForm.hora_salida} onChange={(event) => setEditForm({ ...editForm, hora_salida: event.target.value })} required={!["festivo", "vacaciones"].includes(editForm.tipo)} disabled={["festivo", "vacaciones"].includes(editForm.tipo)} /></label>
+                          <label className="admin-field"><span>Proyecto</span><select value={editForm.proyecto} onChange={(event) => setEditForm({ ...editForm, proyecto: event.target.value })} required={!["festivo", "vacaciones"].includes(editForm.tipo)} disabled={["festivo", "vacaciones"].includes(editForm.tipo)}><option value="">Seleccione un proyecto</option>{editForm.proyecto && !projectOptions.includes(editForm.proyecto) && <option value={editForm.proyecto}>{editForm.proyecto}</option>}{projectOptions.map((project) => <option key={project} value={project}>{project}</option>)}</select></label>
+                          <label className="admin-field"><span>Número de proyecto</span><input value={editForm.numero_proyecto} onChange={(event) => setEditForm({ ...editForm, numero_proyecto: event.target.value })} maxLength="80" required={!["festivo", "vacaciones"].includes(editForm.tipo)} disabled={["festivo", "vacaciones"].includes(editForm.tipo)} /></label>
+                          <label className="admin-field"><span>Cliente</span><select value={editForm.cliente} onChange={(event) => setEditForm({ ...editForm, cliente: event.target.value })} required={!["festivo", "vacaciones"].includes(editForm.tipo)} disabled={["festivo", "vacaciones"].includes(editForm.tipo)}><option value="">Seleccione un cliente</option>{editForm.cliente && !clientOptions.includes(editForm.cliente) && <option value={editForm.cliente}>{editForm.cliente}</option>}{clientOptions.map((client) => <option key={client} value={client}>{client}</option>)}</select></label>
                           <div className="admin-editor-actions"><button type="button" className="admin-secondary-button" onClick={() => { setEditingId(null); setEditForm(null); }}>Cancelar</button><button type="submit" className="admin-primary-button">Guardar cambios</button></div>
                         </form>
                       </td>
                     ) : (
                       <>
                         <td data-label="Fecha">{new Date(`${record.fecha}T00:00:00`).toLocaleDateString("es-CO")}</td>
-                        <td data-label="Trabajador">{record.username}</td>
-                        <td data-label="Entrada">{record.hora_entrada}</td>
-                        <td data-label="Salida">{record.hora_salida}</td>
+                        {isAdmin && <td data-label="Trabajador">{record.username}</td>}
+                        <td data-label="Entrada">{["festivo", "vacaciones"].includes(record.tipo) ? "—" : record.hora_entrada}</td>
+                        <td data-label="Salida">{["festivo", "vacaciones"].includes(record.tipo) ? "—" : record.hora_salida}</td>
+                        <td data-label="Tipo">{(record.tipo || "normal").charAt(0).toLocaleUpperCase("es-CO") + (record.tipo || "normal").slice(1)}</td>
+                        <td data-label="N.º proyecto">{record.numero_proyecto || "—"}</td>
                         <td data-label="Cliente">{record.cliente}</td>
                         <td data-label="Proyecto">{record.proyecto}</td>
-                        <td data-label="Almuerzo">1 h</td>
+                        <td data-label="Almuerzo">{["festivo", "vacaciones"].includes(record.tipo) ? "—" : "1 h"}</td>
                         <td data-label="Horas trabajadas" className="admin-hours-total-cell">{formatoDuracion(actualMinutes)}</td>
-                        <td data-label="Acciones"><div className="admin-hour-actions"><button type="button" className="admin-secondary-button" onClick={() => startEditing(record)}>Editar</button><button type="button" className="admin-danger-button" onClick={() => removeRecord(record)}>Eliminar</button></div></td>
+                        {isAdmin && <td data-label="Acciones"><div className="admin-hour-actions"><button type="button" className="admin-secondary-button" onClick={() => startEditing(record)}>Editar</button><button type="button" className="admin-danger-button" onClick={() => removeRecord(record)}>Eliminar</button></div></td>}
                       </>
                     )}
                   </tr>
