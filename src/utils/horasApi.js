@@ -14,9 +14,12 @@ async function request(path, options = {}) {
   return data;
 }
 
-export function getHourRecords(fecha = "") {
-  const query = fecha ? `?fecha=${encodeURIComponent(fecha)}` : "";
-  return request(`/api/admin/registros-horas${query}`);
+export function getHourRecords(fecha = "", onlyMine = false) {
+  const params = new URLSearchParams();
+  if (fecha) params.set("fecha", fecha);
+  const query = params.toString() ? `?${params.toString()}` : "";
+  const path = onlyMine ? `/api/admin/registros-horas/mios${query}` : `/api/admin/registros-horas${query}`;
+  return request(path);
 }
 
 export function createHourRecord(record) {

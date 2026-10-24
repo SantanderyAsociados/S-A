@@ -744,9 +744,11 @@ function HoursView({ canCreate, isAdmin }) {
   }, []);
 
   useEffect(() => {
+    if (!isAdmin && !canCreate) return undefined;
+
     let active = true;
     setLoading(true);
-    getHourRecords(selectedDate)
+    getHourRecords(selectedDate, !isAdmin)
       .then((data) => {
         if (active) {
           setRecords(data);
@@ -763,7 +765,7 @@ function HoursView({ canCreate, isAdmin }) {
     return () => {
       active = false;
     };
-  }, [selectedDate, refreshVersion]);
+  }, [isAdmin, canCreate, selectedDate, refreshVersion]);
 
   const saveRecord = async (event) => {
     event.preventDefault();
