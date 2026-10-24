@@ -135,23 +135,34 @@
 
 .admin-content-table, .admin-messages-list { display: grid; gap: 8px; }
 .admin-user-form { margin-bottom: 20px; padding: 24px; border: 1px solid var(--admin-line); border-radius: 5px; background: var(--admin-surface); }
-.admin-user-fields { display: grid; grid-template-columns: 1fr 1fr 190px; gap: 15px; }
+.admin-user-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; }
 .admin-user-fields .admin-field { margin-top: 0; }
 .admin-hours-form { margin-bottom: 22px; }
-.admin-hours-fields { display: grid; grid-template-columns: repeat(5, minmax(120px, 1fr)); gap: 14px; }
+.admin-hours-fields { display: grid; grid-template-columns: repeat(3, minmax(120px, 1fr)); gap: 14px; }
 .admin-hours-fields .admin-field { min-width: 0; margin-top: 0; }
 .admin-hours-form-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 18px; }
+.admin-hours-filter { display: flex; align-items: flex-end; gap: 10px; }
+.admin-hours-filter .admin-field { min-width: 185px; margin: 0; }
+.admin-hour-edit-form { display: grid; grid-template-columns: repeat(3, minmax(150px, 1fr)); align-items: end; gap: 12px; }
+.admin-hour-edit-form .admin-field { min-width: 0; margin: 0; }
+.admin-hour-edit-form .admin-editor-actions { grid-column: 1 / -1; margin-top: 0; }
 .admin-hours-success, .admin-hours-error { margin: 0; font-size: 12px; }
 .admin-hours-success { color: #21817a; }
 .admin-hours-error { margin-bottom: 14px; color: var(--admin-red); }
 .admin-hours-table-scroll { overflow-x: auto; border: 1px solid var(--admin-line); border-radius: 5px; background: var(--admin-surface); }
-.admin-hours-table { width: 100%; min-width: 700px; border-collapse: collapse; text-align: left; }
+.admin-hours-table { width: 100%; min-width: 1120px; border-collapse: collapse; text-align: left; }
 .admin-hours-table th, .admin-hours-table td { padding: 14px 16px; border-bottom: 1px solid #eef1f2; font-size: 12px; }
 .admin-hours-table th { color: var(--admin-muted); background: #f7f9f9; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
 .admin-hours-table tbody tr:last-child td { border-bottom: 0; }
 .admin-hours-table td { color: #43535c; }
+.admin-hours-status { display: inline-block; padding: 5px 8px; border-radius: 12px; font-size: 10px; font-weight: 700; white-space: nowrap; }
+.admin-hours-status.is-complete { color: #176e58; background: #e7f5ef; }
+.admin-hours-status.is-overdue { color: #a33c2d; background: #fff0ed; }
+.admin-hours-status.is-unset { color: #687780; background: #eef1f2; }
+.admin-hour-actions { display: flex; gap: 6px; }
+.admin-hour-actions .admin-secondary-button, .admin-hour-actions .admin-danger-button { min-height: 32px; padding: 0 9px; font-size: 10px; }
 .admin-users-table { overflow: hidden; border: 1px solid var(--admin-line); border-radius: 5px; background: var(--admin-surface); }
-.admin-users-header, .admin-user-row { display: grid; grid-template-columns: minmax(180px, 1.4fr) minmax(170px, .9fr) 130px 100px; align-items: center; gap: 18px; padding: 14px 20px; }
+.admin-users-header, .admin-user-row { display: grid; grid-template-columns: minmax(150px, 1.2fr) minmax(140px, .8fr) minmax(220px, 1.3fr) 110px 90px; align-items: center; gap: 14px; padding: 14px 20px; }
 .admin-users-header { color: var(--admin-muted); background: #f7f9f9; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .admin-user-row { min-height: 70px; border-top: 1px solid #eef1f2; }
 .admin-user-name { display: flex; align-items: center; gap: 11px; min-width: 0; }
@@ -160,6 +171,9 @@
 .admin-user-name strong { font-size: 12px; }
 .admin-user-name small { margin-top: 3px; color: var(--admin-teal); font-size: 10px; font-weight: 400; }
 .admin-user-row select { min-height: 34px; padding: 0 8px; border: 1px solid var(--admin-line); border-radius: 3px; color: var(--admin-ink); background: #fbfcfc; font: inherit; font-size: 11px; }
+.admin-salary-editor { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.admin-salary-editor input { width: 100%; min-width: 80px; height: 34px; padding: 0 8px; border: 1px solid var(--admin-line); border-radius: 3px; color: var(--admin-ink); background: #fbfcfc; font: inherit; font-size: 11px; }
+.admin-salary-editor button { min-height: 34px; padding: 0 9px; font-size: 10px; }
 .admin-user-row time { color: var(--admin-muted); font-size: 11px; }
 .admin-user-row button:disabled, .admin-user-row select:disabled { cursor: not-allowed; opacity: .45; }
 .admin-slider-list { display: grid; gap: 12px; }
@@ -474,6 +488,20 @@
     grid-template-columns: 1fr;
     gap: 0;
   }
+  .admin-hours-filter {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .admin-hours-filter .admin-field {
+    min-width: 0;
+  }
+  .admin-hour-edit-form {
+    grid-template-columns: 1fr;
+  }
+  .admin-hour-edit-form .admin-editor-actions {
+    flex-direction: column;
+  }
   .admin-hours-form-footer {
     align-items: stretch;
     flex-direction: column;
@@ -494,6 +522,9 @@
     grid-column: 1 / -1;
     min-height: 40px;
     font-size: 13px;
+  }
+  .admin-user-row .admin-salary-editor {
+    grid-column: 1 / -1;
   }
   .admin-user-row time {
     grid-column: 1;

@@ -14,8 +14,9 @@ async function request(path, options = {}) {
   return data;
 }
 
-export function getHourRecords() {
-  return request("/api/admin/registros-horas");
+export function getHourRecords(fecha = "") {
+  const query = fecha ? `?fecha=${encodeURIComponent(fecha)}` : "";
+  return request(`/api/admin/registros-horas${query}`);
 }
 
 export function createHourRecord(record) {
@@ -23,4 +24,15 @@ export function createHourRecord(record) {
     method: "POST",
     body: JSON.stringify(record),
   });
+}
+
+export function updateHourRecord(id, record) {
+  return request(`/api/admin/registros-horas/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(record),
+  });
+}
+
+export function deleteHourRecord(id) {
+  return request(`/api/admin/registros-horas/${id}`, { method: "DELETE" });
 }

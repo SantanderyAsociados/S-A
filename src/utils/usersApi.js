@@ -28,10 +28,10 @@ export function createUser(user) {
   });
 }
 
-export function updateUserRole(id, role) {
+export function updateUser(id, changes) {
   return request(`/api/admin/usuarios/${id}`, {
     method: "PATCH",
-    body: JSON.stringify({ role }),
+    body: JSON.stringify(changes),
   });
 }
 

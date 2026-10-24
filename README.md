@@ -55,7 +55,7 @@ La tabla `contenido` utiliza el campo `tipo` para separar:
 - `experiencia`
 - `slider`
 
-Los mensajes se guardan en `mensajes`, los accesos en `admin_users` (contraseñas cifradas con bcrypt), los registros de jornada en `registros_horas` y los ajustes generales del sitio, Google Analytics y SEO en `configuracion`.
+Los mensajes se guardan en `mensajes`, los accesos en `admin_users` (contraseñas cifradas con bcrypt), los registros de jornada en `registros_horas` y los ajustes generales del sitio, Google Analytics y SEO en `configuracion`. Cada usuario tiene un sueldo mensual en COP y cada registro de jornada almacena el tiempo estimado en horas para calcular su cumplimiento.
 
 La tabla `registros_horas` almacena fecha, hora de entrada, hora de salida, cliente, proyecto y el usuario que hizo el registro. El backend crea la tabla automáticamente al iniciar y también está declarada en [Backend/data/schema.sql](Backend/data/schema.sql).
 
@@ -257,19 +257,19 @@ El panel administrativo incluye optimizaciones específicas para dispositivos m�
 
 ## Usuarios y roles
 
-El módulo **Usuarios** usa la tabla `admin_users` y permite crear usuarios, cifrar contraseñas, cambiar roles y eliminar cuentas. El usuario actual no puede eliminarse a sí mismo.
+El módulo **Usuarios** usa la tabla `admin_users` y permite crear usuarios, cifrar contraseñas, cambiar roles, editar el sueldo mensual en COP y eliminar cuentas. El usuario actual no puede eliminarse a sí mismo.
 
 Permisos actuales:
 
 | Rol | Permisos |
 | --- | --- |
 | Administrador | Acceso completo, usuarios, configuración del sitio, contenido, publicación y mensajes |
-| Editor (Trabajador) | Registrar y consultar sus propias horas |
+| Editor (Trabajador) | Agregar sus registros de horas; no puede consultarlos, editarlos ni eliminarlos |
 | Autor | Crear, editar y publicar contenido; no elimina |
 | Colaborador | Crear contenido como borrador; no edita ni elimina |
 | Suscriptor | Consulta básica; sin acciones de edición |
 
-El administrador puede consultar los registros de todos los trabajadores; cada Editor, presentado en el panel como **Trabajador**, solo puede registrar y consultar sus propias horas. La matriz se aplica en el frontend y en el backend para bloquear solicitudes no autorizadas.
+El administrador puede consultar, filtrar por fecha, editar y eliminar los registros de todos los trabajadores. Cada jornada compara su tiempo real (salida menos entrada) con el estimado ingresado y muestra si se cumplió. El administrador también puede actualizar el sueldo mensual de cada usuario. Cada Editor, presentado en el panel como **Trabajador**, solo puede agregar sus horas; el servidor bloquea cualquier consulta o modificación de sus registros. El campo de proyecto ofrece sugerencias del catálogo publicado y permite escribir un nombre libre.
 
 ## API principal
 
@@ -305,7 +305,11 @@ DELETE /api/admin/usuarios/:id
 
 GET    /api/admin/registros-horas
 POST   /api/admin/registros-horas
+PATCH  /api/admin/registros-horas/:id
+DELETE /api/admin/registros-horas/:id
 ```
+
+La consulta de registros acepta `?fecha=AAAA-MM-DD` para filtrar una jornada desde el calendario del panel. El backend agrega automáticamente las columnas `monthly_salary` y `tiempo_estimado` en instalaciones existentes; no hace falta instalar dependencias adicionales para estas funciones.
 
 Las utilidades cliente centralizan la comunicación:
 - [src/utils/contentApi.js](src/utils/contentApi.js) para contenido.

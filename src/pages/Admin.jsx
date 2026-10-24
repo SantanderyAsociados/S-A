@@ -28,9 +28,9 @@ import clientes from "../data/clientes";
 import noticias from "../data/noticias";
 import proyectos from "../data/proyectos";
 import servicios from "../data/servicios";
-import { createContent, deleteContent, getAdminContent, resolveImageUrl, updateContent } from "../utils/contentApi";
-import { createUser, deleteUser, getUsers, updateUserRole } from "../utils/usersApi";
-import { createHourRecord, getHourRecords } from "../utils/horasApi";
+import { createContent, deleteContent, getAdminContent, getPublicContent, resolveImageUrl, updateContent } from "../utils/contentApi";
+import { createUser, deleteUser, getUsers, updateUser } from "../utils/usersApi";
+import { createHourRecord, deleteHourRecord, getHourRecords, updateHourRecord } from "../utils/horasApi";
 import { getAdminConfig, updateAdminConfig } from "../utils/configApi";
 import "../styles/admin.css";
 
@@ -52,7 +52,7 @@ const menuItems = [
 
 const ROLE_PERMISSIONS = {
   Administrador: ["content.create", "content.edit", "content.publish", "content.delete", "messages.manage", "users.manage", "settings.manage", "hours.read", "hours.create"],
-  Trabajador: ["hours.read", "hours.create"],
+  Trabajador: ["hours.create"],
   Autor: ["content.create", "content.edit", "content.publish"],
   Colaborador: ["content.create"],
   Suscriptor: [],
@@ -550,12 +550,19 @@ function UsersView({ currentUserId }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
-  const [form, setForm] = useState({ username: "", password: "", role: "Editor" });
+  const [savingSalaryId, setSavingSalaryId] = useState(null);
+  const [salaryDrafts, setSalaryDrafts] = useState({});
+  const [form, setForm] = useState({ username: "", password: "", role: "Editor", monthly_salary: "0" });
 
   const loadUsers = () => {
     setLoading(true);
     getUsers()
-      .then(setUsers)
+      .then((loadedUsers) => {
+        setUsers(loadedUsers);
+        setSalaryDrafts(Object.fromEntries(
+          loadedUsers.map((user) => [user.id, String(Number(user.monthly_salary || 0))])
+        ));
+      })
       .catch((error) => window.alert(error.message))
       .finally(() => setLoading(false));
   };
@@ -567,8 +574,8 @@ function UsersView({ currentUserId }) {
   const create = async (event) => {
     event.preventDefault();
     try {
-      await createUser(form);
-      setForm({ username: "", password: "", role: "Editor" });
+      await createUser({ ...form, monthly_salary: Number(form.monthly_salary) });
+      setForm({ username: "", password: "", role: "Editor", monthly_salary: "0" });
       setFormOpen(false);
       loadUsers();
     } catch (error) {
@@ -578,10 +585,37 @@ function UsersView({ currentUserId }) {
 
   const changeRole = async (id, role) => {
     try {
-      await updateUserRole(id, role);
+      await updateUser(id, { role });
       setUsers((current) => current.map((user) => user.id === id ? { ...user, role } : user));
     } catch (error) {
       window.alert(error.message);
+    }
+  };
+
+  const saveSalary = async (user) => {
+    const rawSalary = salaryDrafts[user.id];
+    const monthly_salary = Number(rawSalary);
+    if (
+      rawSalary.trim() === ""
+      || !Number.isFinite(monthly_salary)
+      || monthly_salary < 0
+      || monthly_salary > 9999999999.99
+    ) {
+      window.alert("Indica un sueldo mensual válido, igual o mayor que cero.");
+      return;
+    }
+    setSavingSalaryId(user.id);
+    try {
+      await updateUser(user.id, { monthly_salary });
+      setUsers((current) => current.map((item) => (
+        item.id === user.id ? { ...item, monthly_salary } : item
+      )));
+      setSalaryDrafts((current) => ({ ...current, [user.id]: String(monthly_salary) }));
+    } catch (error) {
+      window.alert(error.message);
+      loadUsers();
+    } finally {
+      setSavingSalaryId(null);
     }
   };
 
@@ -608,11 +642,12 @@ function UsersView({ currentUserId }) {
           <label className="admin-field"><span>Nombre de usuario</span><input value={form.username} onChange={(event) => setForm({ ...form, username: event.target.value })} minLength="3" required /></label>
           <label className="admin-field"><span>Contraseña</span><input type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} minLength="6" required /></label>
           <label className="admin-field"><span>Rol</span><select value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })}>{roles.map((role) => <option key={role} value={role}>{mostrarRol(role)}</option>)}</select></label>
+          <label className="admin-field"><span>Sueldo mensual (COP)</span><input type="number" min="0" max="9999999999.99" step="1000" value={form.monthly_salary} onChange={(event) => setForm({ ...form, monthly_salary: event.target.value })} required /></label>
         </div>
         <div className="admin-editor-actions"><button type="button" className="admin-secondary-button" onClick={() => setFormOpen(false)}>Cancelar</button><button type="submit" className="admin-primary-button">Crear usuario</button></div>
       </form>}
 
-      {loading ? <div className="admin-empty-state"><RefreshCw className="admin-spin" size={24} /><p>Cargando usuarios...</p></div> : <div className="admin-users-table"><div className="admin-users-header"><span>Usuario</span><span>Rol asignado</span><span>Creado</span><span>Acciones</span></div>{users.map((user) => <div className="admin-user-row" key={user.id}><div className="admin-user-name"><span>{user.username.slice(0, 2).toUpperCase()}</span><strong>{user.username}{user.id === currentUserId && <small>Tu cuenta</small>}</strong></div><select value={user.role === "admin" ? "Administrador" : user.role} onChange={(event) => changeRole(user.id, event.target.value)} disabled={user.id === currentUserId && user.role === "admin"}>{roles.map((role) => <option key={role} value={role}>{mostrarRol(role)}</option>)}</select><time>{new Date(user.created_at).toLocaleDateString("es-CO")}</time><button className="admin-row-action admin-row-delete" onClick={() => remove(user)} disabled={user.id === currentUserId}>Eliminar</button></div>)}</div>}
+      {loading ? <div className="admin-empty-state"><RefreshCw className="admin-spin" size={24} /><p>Cargando usuarios...</p></div> : <div className="admin-users-table"><div className="admin-users-header"><span>Usuario</span><span>Rol asignado</span><span>Sueldo mensual (COP)</span><span>Creado</span><span>Acciones</span></div>{users.map((user) => <div className="admin-user-row" key={user.id}><div className="admin-user-name"><span>{user.username.slice(0, 2).toUpperCase()}</span><strong>{user.username}{user.id === currentUserId && <small>Tu cuenta</small>}</strong></div><select value={user.role === "admin" ? "Administrador" : user.role} onChange={(event) => changeRole(user.id, event.target.value)} disabled={user.id === currentUserId && user.role === "admin"}>{roles.map((role) => <option key={role} value={role}>{mostrarRol(role)}</option>)}</select>      <div className="admin-salary-editor"><input aria-label={`Sueldo mensual de ${user.username}`} type="number" min="0" max="9999999999.99" step="1000" value={salaryDrafts[user.id] ?? "0"} onChange={(event) => setSalaryDrafts((current) => ({ ...current, [user.id]: event.target.value }))} /><button type="button" className="admin-secondary-button" onClick={() => saveSalary(user)} disabled={savingSalaryId === user.id}>{savingSalaryId === user.id ? "Guardando..." : "Guardar"}</button></div><time>{new Date(user.created_at).toLocaleDateString("es-CO")}</time><button className="admin-row-action admin-row-delete" onClick={() => remove(user)} disabled={user.id === currentUserId}>Eliminar</button></div>)}</div>}
     </>
   );
 }
@@ -625,35 +660,52 @@ function fechaLocalActual() {
   return `${year}-${month}-${day}`;
 }
 
+function minutosTrabajados(record) {
+  const [horaEntrada, minutoEntrada] = record.hora_entrada.split(":").map(Number);
+  const [horaSalida, minutoSalida] = record.hora_salida.split(":").map(Number);
+  return horaSalida * 60 + minutoSalida - (horaEntrada * 60 + minutoEntrada);
+}
+
 function HoursView({ canCreate, isAdmin }) {
   const [records, setRecords] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(isAdmin);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [selectedDate, setSelectedDate] = useState("");
+  const [refreshVersion, setRefreshVersion] = useState(0);
+  const [projectNames, setProjectNames] = useState([]);
+  const [projectLoadError, setProjectLoadError] = useState("");
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState(null);
   const [form, setForm] = useState({
     fecha: fechaLocalActual(),
     hora_entrada: "",
     hora_salida: "",
     cliente: "",
     proyecto: "",
+    tiempo_estimado: "",
   });
-
-  const loadRecords = async () => {
-    try {
-      const data = await getHourRecords();
-      setRecords(data);
-      setError("");
-    } catch (requestError) {
-      setError(requestError.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
     let active = true;
-    getHourRecords()
+    getPublicContent("proyectos")
+      .then((items) => {
+        if (active) setProjectNames(items.map((item) => item.titulo).filter(Boolean));
+      })
+      .catch((requestError) => {
+        if (active) setProjectLoadError(`No se pudieron cargar las sugerencias de proyectos: ${requestError.message}`);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isAdmin) return undefined;
+    let active = true;
+    getHourRecords(selectedDate)
       .then((data) => {
         if (active) {
           setRecords(data);
@@ -670,7 +722,7 @@ function HoursView({ canCreate, isAdmin }) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [isAdmin, selectedDate, refreshVersion]);
 
   const saveRecord = async (event) => {
     event.preventDefault();
@@ -678,19 +730,22 @@ function HoursView({ canCreate, isAdmin }) {
     setError("");
     setSuccess("");
     try {
-      const record = await createHourRecord(form);
-      setRecords((current) => [record, ...current].sort((a, b) => (
-        b.fecha.localeCompare(a.fecha)
-        || b.hora_entrada.localeCompare(a.hora_entrada)
-      )));
+      const record = await createHourRecord({ ...form, tiempo_estimado: Number(form.tiempo_estimado) });
+      if (isAdmin && (!selectedDate || selectedDate === record.fecha)) {
+        setRecords((current) => [record, ...current].sort((a, b) => (
+          b.fecha.localeCompare(a.fecha)
+          || b.hora_entrada.localeCompare(a.hora_entrada)
+        )));
+      }
       setForm((current) => ({
         ...current,
         hora_entrada: "",
         hora_salida: "",
         cliente: "",
         proyecto: "",
+        tiempo_estimado: "",
       }));
-      setSuccess("Registro guardado correctamente.");
+      setSuccess(isAdmin ? "Registro guardado correctamente." : "Horas agregadas correctamente.");
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -698,18 +753,73 @@ function HoursView({ canCreate, isAdmin }) {
     }
   };
 
+  const startEditing = (record) => {
+    setEditingId(record.id);
+    setEditForm({
+      fecha: record.fecha,
+      hora_entrada: record.hora_entrada,
+      hora_salida: record.hora_salida,
+      cliente: record.cliente,
+      proyecto: record.proyecto,
+      tiempo_estimado: String(Number(record.tiempo_estimado)),
+    });
+    setError("");
+  };
+
+  const saveEdit = async (event) => {
+    event.preventDefault();
+    setError("");
+    try {
+      const updatedRecord = await updateHourRecord(editingId, {
+        ...editForm,
+        tiempo_estimado: Number(editForm.tiempo_estimado),
+      });
+      setRecords((current) => current
+        .map((record) => record.id === editingId ? updatedRecord : record)
+        .filter((record) => !selectedDate || record.fecha === selectedDate));
+      setEditingId(null);
+      setEditForm(null);
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  };
+
+  const removeRecord = async (record) => {
+    if (!window.confirm(`¿Eliminar el registro de ${record.username} del ${record.fecha}?`)) return;
+    setError("");
+    try {
+      await deleteHourRecord(record.id);
+      setRecords((current) => current.filter((item) => item.id !== record.id));
+      if (editingId === record.id) {
+        setEditingId(null);
+        setEditForm(null);
+      }
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  };
+
+  const renderProjectField = (value, onChange, required = true) => (
+    <input list="admin-hour-projects" value={value} onChange={onChange} maxLength="180" required={required} />
+  );
+
   return (
     <>
       <div className="admin-page-heading">
         <div>
           <span className="admin-eyebrow">{isAdmin ? "CONTROL DE JORNADAS" : "MI JORNADA"}</span>
           <h1>Registro de horas</h1>
-          <p>{isAdmin ? "Consulta los registros de todos los trabajadores y agrega registros." : "Registra tu hora de entrada y salida, cliente y proyecto."}</p>
+          <p>{isAdmin ? "Consulta, filtra por fecha y administra las jornadas de todos los trabajadores." : "Agrega tus horas de entrada y salida, cliente y proyecto."}</p>
         </div>
-        <button type="button" className="admin-secondary-button" onClick={() => { setLoading(true); loadRecords(); }} disabled={loading}>
-          <RefreshCw size={16} /> Actualizar
-        </button>
+        {isAdmin && <div className="admin-hours-filter">
+          <label className="admin-field"><span>Consultar fecha</span><input type="date" value={selectedDate} onChange={(event) => { setLoading(true); setSelectedDate(event.target.value); }} /></label>
+          <button type="button" className="admin-secondary-button" onClick={() => { setLoading(true); setSelectedDate(""); }} disabled={!selectedDate}>Ver todas</button>
+          <button type="button" className="admin-secondary-button" onClick={() => { setLoading(true); setRefreshVersion((current) => current + 1); }} disabled={loading}><RefreshCw size={15} /> Actualizar</button>
+        </div>}
       </div>
+      <datalist id="admin-hour-projects">
+        {projectNames.map((name) => <option key={name} value={name} />)}
+      </datalist>
 
       {canCreate && (
         <form className="admin-user-form admin-hours-form" onSubmit={saveRecord}>
@@ -732,12 +842,17 @@ function HoursView({ canCreate, isAdmin }) {
             </label>
             <label className="admin-field">
               <span>Proyecto</span>
-              <input value={form.proyecto} onChange={(event) => setForm({ ...form, proyecto: event.target.value })} maxLength="180" required />
+              {renderProjectField(form.proyecto, (event) => setForm({ ...form, proyecto: event.target.value }))}
+            </label>
+            <label className="admin-field">
+              <span>Tiempo estimado (horas)</span>
+              <input type="number" min="0.01" max="24" step="0.25" value={form.tiempo_estimado} onChange={(event) => setForm({ ...form, tiempo_estimado: event.target.value })} required />
             </label>
           </div>
+          {projectLoadError && <p className="admin-hours-error" role="alert">{projectLoadError}</p>}
           <div className="admin-hours-form-footer">
             {success && <p className="admin-hours-success" role="status">{success}</p>}
-            {error && <p className="admin-hours-error" role="alert">{error}</p>}
+            {error && !isAdmin && <p className="admin-hours-error" role="alert">{error}</p>}
             <button type="submit" className="admin-primary-button" disabled={saving}>
               {saving ? "Guardando..." : "Guardar registro"}
             </button>
@@ -745,11 +860,11 @@ function HoursView({ canCreate, isAdmin }) {
         </form>
       )}
 
-      {error && !canCreate && <p className="admin-hours-error" role="alert">{error}</p>}
-      {loading ? (
+      {error && isAdmin && <p className="admin-hours-error" role="alert">{error}</p>}
+      {isAdmin && (loading ? (
         <div className="admin-empty-state"><RefreshCw className="admin-spin" size={24} /><p>Cargando registros...</p></div>
       ) : records.length === 0 ? (
-        <div className="admin-empty-state"><span><Clock3 size={26} /></span><h2>No hay registros</h2><p>Los registros de horas guardados aparecerán aquí.</p></div>
+        <div className="admin-empty-state"><span><Clock3 size={26} /></span><h2>No hay registros</h2><p>{selectedDate ? "No hay registros para la fecha seleccionada." : "Los registros de horas guardados aparecerán aquí."}</p></div>
       ) : (
         <div className="admin-hours-table-scroll">
           <table className="admin-hours-table">
@@ -761,23 +876,54 @@ function HoursView({ canCreate, isAdmin }) {
                 <th>Hora de salida</th>
                 <th>Cliente</th>
                 <th>Proyecto</th>
+                <th>Estimado</th>
+                <th>Tiempo real</th>
+                <th>Cumplimiento</th>
+                <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
-              {records.map((record) => (
-                <tr key={record.id}>
-                  <td>{new Date(`${record.fecha}T00:00:00`).toLocaleDateString("es-CO")}</td>
-                  {isAdmin && <td>{record.username}</td>}
-                  <td>{record.hora_entrada}</td>
-                  <td>{record.hora_salida}</td>
-                  <td>{record.cliente}</td>
-                  <td>{record.proyecto}</td>
-                </tr>
-              ))}
+              {records.map((record) => {
+                const actualMinutes = minutosTrabajados(record);
+                const estimatedHours = Number(record.tiempo_estimado);
+                const completion = estimatedHours <= 0
+                  ? null
+                  : actualMinutes <= estimatedHours * 60;
+                return (
+                  <tr key={record.id}>
+                    {editingId === record.id ? (
+                      <td colSpan="10">
+                        <form className="admin-hour-edit-form" onSubmit={saveEdit}>
+                          <label className="admin-field"><span>Fecha</span><input type="date" value={editForm.fecha} onChange={(event) => setEditForm({ ...editForm, fecha: event.target.value })} required /></label>
+                          <label className="admin-field"><span>Entrada</span><input type="time" value={editForm.hora_entrada} onChange={(event) => setEditForm({ ...editForm, hora_entrada: event.target.value })} required /></label>
+                          <label className="admin-field"><span>Salida</span><input type="time" value={editForm.hora_salida} onChange={(event) => setEditForm({ ...editForm, hora_salida: event.target.value })} required /></label>
+                          <label className="admin-field"><span>Cliente</span><input value={editForm.cliente} onChange={(event) => setEditForm({ ...editForm, cliente: event.target.value })} maxLength="180" required /></label>
+                          <label className="admin-field"><span>Proyecto</span>{renderProjectField(editForm.proyecto, (event) => setEditForm({ ...editForm, proyecto: event.target.value }))}</label>
+                          <label className="admin-field"><span>Estimado (h)</span><input type="number" min="0.01" max="24" step="0.25" value={editForm.tiempo_estimado} onChange={(event) => setEditForm({ ...editForm, tiempo_estimado: event.target.value })} required /></label>
+                          <div className="admin-editor-actions"><button type="button" className="admin-secondary-button" onClick={() => { setEditingId(null); setEditForm(null); }}>Cancelar</button><button type="submit" className="admin-primary-button">Guardar cambios</button></div>
+                        </form>
+                      </td>
+                    ) : (
+                      <>
+                        <td>{new Date(`${record.fecha}T00:00:00`).toLocaleDateString("es-CO")}</td>
+                        <td>{record.username}</td>
+                        <td>{record.hora_entrada}</td>
+                        <td>{record.hora_salida}</td>
+                        <td>{record.cliente}</td>
+                        <td>{record.proyecto}</td>
+                        <td>{estimatedHours > 0 ? `${estimatedHours.toFixed(2)} h` : "Sin estimado"}</td>
+                        <td>{(actualMinutes / 60).toFixed(2)} h</td>
+                        <td><span className={`admin-hours-status ${completion === null ? "is-unset" : completion ? "is-complete" : "is-overdue"}`}>{completion === null ? "Sin estimado" : completion ? "Cumplido" : "Excedido"}</span></td>
+                        <td><div className="admin-hour-actions"><button type="button" className="admin-secondary-button" onClick={() => startEditing(record)}>Editar</button><button type="button" className="admin-danger-button" onClick={() => removeRecord(record)}>Eliminar</button></div></td>
+                      </>
+                    )}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
-      )}
+      ))}
     </>
   );
 }
