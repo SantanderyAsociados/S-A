@@ -55,7 +55,7 @@
 .admin-sidebar-bottom .admin-signout:hover { color: #fff; background: var(--admin-red); }
 .admin-sidebar-overlay, .admin-mobile-menu { display: none; }
 
-.admin-main { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+.admin-main { min-width: 0; flex: 1; display: flex; flex-direction: column; container: admin-main / inline-size; }
 .admin-topbar { height: 76px; display: flex; align-items: center; justify-content: space-between; padding: 0 42px; background: var(--admin-surface); border-bottom: 1px solid var(--admin-line); position: sticky; top: 0; z-index: 20; }
 .admin-breadcrumb { display: flex; align-items: center; gap: 9px; color: #9aa5ab; font-size: 13px; }
 .admin-breadcrumb strong { color: var(--admin-ink); font-weight: 600; }
@@ -89,7 +89,7 @@
 .admin-user strong, .admin-user small { display: block; }
 .admin-user strong { font-size: 12px; font-weight: 700; }
 .admin-user small { margin-top: 2px; color: var(--admin-muted); font-size: 10px; }
-.admin-content { max-width: 1440px; margin: 0 auto; padding: 42px 5%; }
+.admin-content { width: 100%; min-width: 0; max-width: 1440px; margin: 0 auto; padding: 42px 5%; }
 .admin-page-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 32px; }
 .admin-heading-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .admin-page-heading h1 { margin: 8px 0 8px; color: var(--admin-ink); font-size: clamp(26px, 3vw, 34px); letter-spacing: -.04em; font-weight: 700; }
@@ -423,6 +423,104 @@
 .admin-message-actions { display: flex; gap: 8px; margin-top: 16px; }
 .admin-spin { animation: admin-spin 1s linear infinite; }
 @keyframes admin-spin { to { transform: rotate(360deg); } }
+
+@container admin-main (max-width: 1180px) {
+  .admin-content {
+    padding-inline: clamp(16px, 3vw, 36px);
+  }
+  .admin-hours-page-heading {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .admin-hours-filter {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
+  }
+  .admin-hours-filter .admin-field {
+    min-width: 0;
+  }
+  .admin-hours-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .admin-hours-fields {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  }
+  .admin-hours-table-scroll {
+    width: 100%;
+    overflow: visible;
+    border: 0;
+    background: transparent;
+  }
+  .admin-hours-table,
+  .admin-hours-report-table {
+    display: block;
+    min-width: 0;
+  }
+  .admin-hours-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    clip-path: inset(50%);
+  }
+  .admin-hours-table tbody {
+    display: grid;
+    gap: 12px;
+  }
+  .admin-hours-table tbody tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow: hidden;
+    border: 1px solid var(--admin-line);
+    border-radius: 8px;
+    background: var(--admin-surface);
+    box-shadow: 0 5px 15px rgba(23,43,59,.04);
+  }
+  .admin-hours-table td {
+    display: flex;
+    min-width: 0;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    border-bottom: 1px solid #eef1f2;
+    overflow-wrap: anywhere;
+  }
+  .admin-hours-table td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    color: var(--admin-muted);
+    font-size: 10px;
+    font-weight: 700;
+  }
+  .admin-hours-table td[data-label="N.º proyecto"],
+  .admin-hours-table td[data-label="Cliente"],
+  .admin-hours-table td[data-label="Proyecto"],
+  .admin-hours-table td[data-label="Acciones"] {
+    grid-column: 1 / -1;
+  }
+  .admin-hours-table td:last-child {
+    border-bottom: 0;
+  }
+  .admin-hours-table td[colspan] {
+    grid-column: 1 / -1;
+    display: block;
+  }
+  .admin-hours-table td[colspan]::before {
+    content: none;
+  }
+  .admin-hour-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .admin-hour-edit-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 
 @media (max-width: 1050px) {
   .admin-sidebar { width: 220px; flex-basis: 220px; }
@@ -886,5 +984,44 @@
   .admin-quick-actions button {
     width: 100%;
     justify-content: center;
+  }
+}
+
+@container admin-main (max-width: 650px) {
+  .admin-hours-summary,
+  .admin-hours-fields,
+  .admin-hour-edit-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .admin-hours-fields .admin-field:first-child,
+  .admin-hours-fields .admin-field:nth-last-child(-n + 2) {
+    grid-column: auto;
+  }
+  .admin-hours-calculation {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    padding: 14px 12px;
+  }
+  .admin-hours-calculation-operator {
+    display: none;
+  }
+  .admin-hours-calculation .admin-hours-net {
+    padding-left: 8px;
+  }
+  .admin-hours-table tbody tr {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .admin-hours-filter {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .admin-hours-filter > * {
+    width: 100%;
+  }
+  .admin-hour-actions {
+    justify-content: stretch;
+  }
+  .admin-hour-actions button {
+    flex: 1 1 auto;
+    min-height: 40px;
   }
 }
