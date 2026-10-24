@@ -271,7 +271,7 @@ Permisos actuales:
 
 El administrador puede filtrar por periodo de nómina, trabajador y fecha exacta; consultar el total de horas, la liquidación proyectada, el cumplimiento, el resumen por persona y la inversión por proyecto; además puede editar o eliminar cualquier registro. El trabajador selecciona el mes y solo consulta sus propias jornadas; no tiene controles de edición o eliminación. La API limita esa consulta al ID autenticado y protege los endpoints de edición y eliminación para que solo los administradores puedan usarlos.
 
-El formulario ofrece los proyectos y clientes de referencia en [src/data/horasCatalogos.js](src/data/horasCatalogos.js), e incluye los tipos Normal, Sábado, Domingo, Festivo y Vacaciones. Las jornadas normales descuentan una hora de almuerzo. Las vacaciones registran 9 horas en días hábiles y no se permiten en fines de semana; un festivo registra 0 horas. El salario por hora se calcula como sueldo mensual / 175; domingos (por tipo o por fecha) aplican factor 1,75, mientras los demás tipos pagables usan el valor base. El backend valida y calcula las horas, sin confiar en valores de pago enviados por el navegador.
+El formulario permite registrar jornadas con los proyectos y clientes de referencia en [src/data/horasCatalogos.js](src/data/horasCatalogos.js); no solicita un tipo de jornada. Cada registro nuevo descuenta una hora de almuerzo. El salario por hora se calcula como sueldo mensual / 175 y los domingos aplican un factor de 1,75. El backend conserva el tipo de los registros históricos y admite los tipos existentes para mantener la compatibilidad de datos; valida y calcula las horas sin confiar en valores de pago enviados por el navegador.
 
 ## API principal
 
@@ -312,7 +312,7 @@ PATCH  /api/admin/registros-horas/:id
 DELETE /api/admin/registros-horas/:id
 ```
 
-La consulta administrativa admite `?mes=AAAA-MM` y `?fecha=AAAA-MM-DD`; el endpoint `/mios` recibe `?mes=AAAA-MM` y responde solo con registros y sueldo del usuario autenticado. Las columnas `tipo` y `numero_proyecto` se crean automáticamente para instalaciones existentes y también están declaradas en [Backend/data/schema.sql](../Backend/data/schema.sql). El listado de jornadas se adapta a tarjetas en pantallas estrechas.
+La consulta administrativa admite `?mes=AAAA-MM` y `?fecha=AAAA-MM-DD`; el endpoint `/mios` recibe `?mes=AAAA-MM` y responde solo con registros y sueldo del usuario autenticado. Las columnas `tipo` y `numero_proyecto` se crean automáticamente para instalaciones existentes y también están declaradas en [Backend/data/schema.sql](../Backend/data/schema.sql); `tipo` se mantiene para compatibilidad con registros históricos aunque ya no se expone en el formulario. El listado de jornadas se adapta a tarjetas en pantallas estrechas.
 
 Las utilidades cliente centralizan la comunicación:
 - [src/utils/contentApi.js](src/utils/contentApi.js) para contenido.

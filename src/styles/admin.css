@@ -299,7 +299,7 @@
 .admin-hours-success, .admin-hours-error { margin: 0; font-size: 12px; }
 .admin-hours-success { color: #21817a; }
 .admin-hours-error { margin-bottom: 14px; color: var(--admin-red); }
-.admin-hours-table-scroll { overflow-x: auto; border: 1px solid var(--admin-line); border-radius: 5px; background: var(--admin-surface); }
+.admin-hours-table-scroll { width: 100%; max-width: 100%; overflow-x: auto; border: 1px solid var(--admin-line); border-radius: 5px; background: var(--admin-surface); }
 .admin-hours-table { width: 100%; min-width: 1160px; border-collapse: collapse; text-align: left; }
 .admin-hours-table th, .admin-hours-table td { padding: 14px 16px; border-bottom: 1px solid #eef1f2; font-size: 12px; }
 .admin-hours-table th { color: var(--admin-muted); background: #f7f9f9; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
@@ -432,14 +432,17 @@
   .admin-hours-summary { gap: 12px; }
   .admin-hours-summary-card { padding-inline: 16px; }
   .admin-hours-analytics { padding: 18px; }
-  .admin-hours-table-scroll { overflow: visible; border: 0; background: transparent; }
+  .admin-hours-table-scroll { width: 100%; overflow: visible; border: 0; background: transparent; }
   .admin-hours-table { display: block; min-width: 0; }
   .admin-hours-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); }
   .admin-hours-table tbody { display: grid; gap: 12px; }
   .admin-hours-table tbody tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: hidden; border: 1px solid var(--admin-line); border-radius: 8px; background: var(--admin-surface); box-shadow: 0 5px 15px rgba(23,43,59,.04); }
   .admin-hours-table td { display: flex; min-width: 0; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 12px 14px; border-bottom: 1px solid #eef1f2; overflow-wrap: anywhere; }
   .admin-hours-table td::before { content: attr(data-label); flex: 0 0 auto; color: var(--admin-muted); font-size: 10px; font-weight: 700; }
-  .admin-hours-table td:nth-child(5), .admin-hours-table td:nth-child(6), .admin-hours-table td:last-child { grid-column: 1 / -1; }
+  .admin-hours-table td[data-label="N.º proyecto"],
+  .admin-hours-table td[data-label="Cliente"],
+  .admin-hours-table td[data-label="Proyecto"],
+  .admin-hours-table td[data-label="Acciones"] { grid-column: 1 / -1; }
   .admin-hours-table td:last-child { border-bottom: 0; }
   .admin-hours-table td[colspan] { grid-column: 1 / -1; display: block; }
   .admin-hours-table td[colspan]::before { content: none; }
@@ -580,6 +583,9 @@
   .admin-content {
     padding: 22px 14px;
   }
+  .admin-hours-table tbody tr {
+    grid-template-columns: minmax(0, 1fr);
+  }
   .admin-page-heading {
     align-items: flex-start;
     flex-direction: column;
@@ -651,6 +657,7 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 14px;
   }
+  .admin-hours-fields .admin-field { min-width: 0; }
   .admin-hours-fields .admin-field:first-child,
   .admin-hours-fields .admin-field:nth-last-child(-n + 2) {
     grid-column: 1 / -1;
@@ -854,6 +861,9 @@
 }
 
 @media (max-width: 420px) {
+  .admin-hours-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
   .admin-stat-grid {
     grid-template-columns: 1fr;
   }

@@ -745,7 +745,6 @@ function HoursView({ canCreate, isAdmin }) {
     fecha: fechaLocalActual(),
     hora_entrada: "",
     hora_salida: "",
-    tipo: "normal",
     numero_proyecto: "",
     cliente: "",
     proyecto: "",
@@ -860,18 +859,11 @@ function HoursView({ canCreate, isAdmin }) {
   const saveRecord = async (event) => {
     event.preventDefault();
     const jornada = calcularHorasFormulario(form);
-    const esJornadaEspecial = form.tipo === "festivo" || form.tipo === "vacaciones";
-    const fecha = new Date(`${form.fecha}T00:00:00`);
-    const esFinDeSemana = fecha.getDay() === 0 || fecha.getDay() === 6;
-    if (!jornada || (!esJornadaEspecial && jornada.workedMinutes <= 0)) {
+    if (!jornada || jornada.workedMinutes <= 0) {
       setError("Verifica la fecha y las horas. La salida debe ser posterior a la entrada y la jornada debe superar una hora.");
       return;
     }
-    if (form.tipo === "vacaciones" && esFinDeSemana) {
-      setError("Las vacaciones solo se pueden registrar en días hábiles.");
-      return;
-    }
-    if (!esJornadaEspecial && (!form.proyecto || !form.numero_proyecto.trim() || !form.cliente)) {
+    if (!form.proyecto || !form.numero_proyecto.trim() || !form.cliente) {
       setError("Selecciona un proyecto y un cliente e indica el número de proyecto.");
       return;
     }
@@ -880,12 +872,7 @@ function HoursView({ canCreate, isAdmin }) {
     setError("");
     setSuccess("");
     try {
-      const record = await createHourRecord({
-        ...form,
-        ...(esJornadaEspecial
-          ? { hora_entrada: "", hora_salida: "", numero_proyecto: "", cliente: "", proyecto: "" }
-          : {}),
-      });
+      const record = await createHourRecord(form);
       const matchesMonth = !selectedMonth || record.fecha.startsWith(selectedMonth);
       if (matchesMonth) {
         setRecords((current) => [record, ...current].sort((a, b) => (
@@ -1038,35 +1025,16 @@ function HoursView({ canCreate, isAdmin }) {
               <input type="date" value={form.fecha} onChange={(event) => setForm({ ...form, fecha: event.target.value })} required />
             </label>
             <label className="admin-field">
-              <span>Tipo de jornada</span>
-              <select value={form.tipo} onChange={(event) => {
-                const tipo = event.target.value;
-                setForm({
-                  ...form,
-                  tipo,
-                  ...(tipo === "festivo" || tipo === "vacaciones"
-                    ? { hora_entrada: "", hora_salida: "", numero_proyecto: "", cliente: "", proyecto: "" }
-                    : {}),
-                });
-              }}>
-                <option value="normal">Normal</option>
-                <option value="sabado">Sábado</option>
-                <option value="domingo">Domingo</option>
-                <option value="festivo">Festivo</option>
-                <option value="vacaciones">Vacaciones</option>
-              </select>
-            </label>
-            <label className="admin-field">
               <span>Hora de entrada</span>
-              <input type="time" value={form.hora_entrada} onChange={(event) => setForm({ ...form, hora_entrada: event.target.value })} required={!["festivo", "vacaciones"].includes(form.tipo)} disabled={["festivo", "vacaciones"].includes(form.tipo)} />
+              <input type="time" value={form.hora_entrada} onChange={(event) => setForm({ ...form, hora_entrada: event.target.value })} required />
             </label>
             <label className="admin-field">
               <span>Hora de salida</span>
-              <input type="time" min={form.hora_entrada || undefined} value={form.hora_salida} onChange={(event) => setForm({ ...form, hora_salida: event.target.value })} required={!["festivo", "vacaciones"].includes(form.tipo)} disabled={["festivo", "vacaciones"].includes(form.tipo)} />
+              <input type="time" min={form.hora_entrada || undefined} value={form.hora_salida} onChange={(event) => setForm({ ...form, hora_salida: event.target.value })} required />
             </label>
             <label className="admin-field">
               <span>Proyecto</span>
-              <select value={form.proyecto} onChange={(event) => setForm({ ...form, proyecto: event.target.value })} required={!["festivo", "vacaciones"].includes(form.tipo)} disabled={["festivo", "vacaciones"].includes(form.tipo)}>
+              <select value={form.proyecto} onChange={(event) => setForm({ ...form, proyecto: event.target.value })} required>
                 <option value="">Seleccione un proyecto</option>
                 {form.proyecto && !projectOptions.includes(form.proyecto) && <option value={form.proyecto}>{form.proyecto}</option>}
                 {projectOptions.map((project) => <option key={project} value={project}>{project}</option>)}
@@ -1074,11 +1042,11 @@ function HoursView({ canCreate, isAdmin }) {
             </label>
             <label className="admin-field">
               <span>Número de proyecto</span>
-              <input value={form.numero_proyecto} onChange={(event) => setForm({ ...form, numero_proyecto: event.target.value })} maxLength="80" required={!["festivo", "vacaciones"].includes(form.tipo)} disabled={["festivo", "vacaciones"].includes(form.tipo)} />
+              <input value={form.numero_proyecto} onChange={(event) => setForm({ ...form, numero_proyecto: event.target.value })} maxLength="80" required />
             </label>
             <label className="admin-field">
               <span>Cliente</span>
-              <select value={form.cliente} onChange={(event) => setForm({ ...form, cliente: event.target.value })} required={!["festivo", "vacaciones"].includes(form.tipo)} disabled={["festivo", "vacaciones"].includes(form.tipo)}>
+              <select value={form.cliente} onChange={(event) => setForm({ ...form, cliente: event.target.value })} required>
                 <option value="">Seleccione un cliente</option>
                 {form.cliente && !clientOptions.includes(form.cliente) && <option value={form.cliente}>{form.cliente}</option>}
                 {clientOptions.map((client) => <option key={client} value={client}>{client}</option>)}
@@ -1086,19 +1054,13 @@ function HoursView({ canCreate, isAdmin }) {
             </label>
           </div>
           <div className="admin-hours-calculation" aria-live="polite">
-            <div><span>{form.tipo === "vacaciones" ? "Día hábil" : form.tipo === "festivo" ? "Festivo" : "Tiempo total"}</span><strong>{resumenJornada ? formatoDuracion(resumenJornada.totalMinutes) : "--"}</strong></div>
+            <div><span>Tiempo total</span><strong>{resumenJornada ? formatoDuracion(resumenJornada.totalMinutes) : "--"}</strong></div>
             <span className="admin-hours-calculation-operator" aria-hidden="true">−</span>
-            <div><span>Almuerzo</span><strong>{["festivo", "vacaciones"].includes(form.tipo) ? "—" : "1 h"}</strong></div>
+            <div><span>Almuerzo</span><strong>1 h</strong></div>
             <span className="admin-hours-calculation-operator" aria-hidden="true">=</span>
             <div className="admin-hours-net"><span>Horas a liquidar</span><strong>{resumenJornada ? formatoDuracion(resumenJornada.workedMinutes) : "--"}</strong></div>
           </div>
-          <p className="admin-hours-hint">
-            {form.tipo === "vacaciones"
-              ? "Las vacaciones registran 9 horas en días hábiles; no se permiten en fines de semana."
-              : form.tipo === "festivo"
-                ? "El festivo registra 0 horas y no genera liquidación adicional."
-                : "Se descuenta 1 hora de almuerzo. El domingo aplica recargo del 75%."}
-          </p>
+          <p className="admin-hours-hint">Se descuenta 1 hora de almuerzo. El domingo aplica recargo del 75%.</p>
           {error && <p className="admin-hours-error" role="alert">{error}</p>}
           <div className="admin-hours-form-footer">
             {success && <p className="admin-hours-success" role="status">{success}</p>}
@@ -1176,7 +1138,6 @@ function HoursView({ canCreate, isAdmin }) {
                 {isAdmin && <th>Trabajador</th>}
                 <th>Hora de entrada</th>
                 <th>Hora de salida</th>
-                <th>Tipo</th>
                 <th>N.º proyecto</th>
                 <th>Cliente</th>
                 <th>Proyecto</th>
@@ -1191,19 +1152,9 @@ function HoursView({ canCreate, isAdmin }) {
                 return (
                   <tr key={record.id}>
                     {isAdmin && editingId === record.id ? (
-                      <td colSpan={isAdmin ? 11 : 9}>
+                      <td colSpan={10}>
                         <form className="admin-hour-edit-form" onSubmit={saveEdit}>
                           <label className="admin-field"><span>Fecha</span><input type="date" value={editForm.fecha} onChange={(event) => setEditForm({ ...editForm, fecha: event.target.value })} required /></label>
-                          <label className="admin-field"><span>Tipo de jornada</span><select value={editForm.tipo} onChange={(event) => {
-                            const tipo = event.target.value;
-                            setEditForm({
-                              ...editForm,
-                              tipo,
-                              ...(tipo === "festivo" || tipo === "vacaciones"
-                                ? { hora_entrada: "", hora_salida: "", numero_proyecto: "", cliente: "", proyecto: "" }
-                                : {}),
-                            });
-                          }}><option value="normal">Normal</option><option value="sabado">Sábado</option><option value="domingo">Domingo</option><option value="festivo">Festivo</option><option value="vacaciones">Vacaciones</option></select></label>
                           <label className="admin-field"><span>Entrada</span><input type="time" value={editForm.hora_entrada} onChange={(event) => setEditForm({ ...editForm, hora_entrada: event.target.value })} required={!["festivo", "vacaciones"].includes(editForm.tipo)} disabled={["festivo", "vacaciones"].includes(editForm.tipo)} /></label>
                           <label className="admin-field"><span>Salida</span><input type="time" min={editForm.hora_entrada || undefined} value={editForm.hora_salida} onChange={(event) => setEditForm({ ...editForm, hora_salida: event.target.value })} required={!["festivo", "vacaciones"].includes(editForm.tipo)} disabled={["festivo", "vacaciones"].includes(editForm.tipo)} /></label>
                           <label className="admin-field"><span>Proyecto</span><select value={editForm.proyecto} onChange={(event) => setEditForm({ ...editForm, proyecto: event.target.value })} required={!["festivo", "vacaciones"].includes(editForm.tipo)} disabled={["festivo", "vacaciones"].includes(editForm.tipo)}><option value="">Seleccione un proyecto</option>{editForm.proyecto && !projectOptions.includes(editForm.proyecto) && <option value={editForm.proyecto}>{editForm.proyecto}</option>}{projectOptions.map((project) => <option key={project} value={project}>{project}</option>)}</select></label>
@@ -1218,7 +1169,6 @@ function HoursView({ canCreate, isAdmin }) {
                         {isAdmin && <td data-label="Trabajador">{record.username}</td>}
                         <td data-label="Entrada">{["festivo", "vacaciones"].includes(record.tipo) ? "—" : record.hora_entrada}</td>
                         <td data-label="Salida">{["festivo", "vacaciones"].includes(record.tipo) ? "—" : record.hora_salida}</td>
-                        <td data-label="Tipo">{(record.tipo || "normal").charAt(0).toLocaleUpperCase("es-CO") + (record.tipo || "normal").slice(1)}</td>
                         <td data-label="N.º proyecto">{record.numero_proyecto || "—"}</td>
                         <td data-label="Cliente">{record.cliente}</td>
                         <td data-label="Proyecto">{record.proyecto}</td>
