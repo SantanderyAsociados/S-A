@@ -660,10 +660,33 @@ function fechaLocalActual() {
   return `${year}-${month}-${day}`;
 }
 
+function calcularJornada(horaEntrada, horaSalida) {
+  if (!horaEntrada || !horaSalida) return null;
+  const entrada = /^([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/.exec(horaEntrada);
+  const salida = /^([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/.exec(horaSalida);
+  if (!entrada || !salida) return null;
+
+  const inicio = Number(entrada[1]) * 60 + Number(entrada[2]);
+  const fin = Number(salida[1]) * 60 + Number(salida[2]);
+  if (fin <= inicio) return null;
+
+  const totalMinutes = fin - inicio;
+  return {
+    totalMinutes,
+    workedMinutes: Math.max(0, totalMinutes - 60),
+  };
+}
+
 function minutosTrabajados(record) {
-  const [horaEntrada, minutoEntrada] = record.hora_entrada.split(":").map(Number);
-  const [horaSalida, minutoSalida] = record.hora_salida.split(":").map(Number);
-  return horaSalida * 60 + minutoSalida - (horaEntrada * 60 + minutoEntrada);
+  return calcularJornada(record.hora_entrada, record.hora_salida)?.workedMinutes || 0;
+}
+
+function formatoDuracion(minutes) {
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  if (hours && remainingMinutes) return `${hours} h ${remainingMinutes} min`;
+  if (hours) return `${hours} h`;
+  return `${remainingMinutes} min`;
 }
 
 function HoursView({ canCreate, isAdmin }) {
@@ -684,8 +707,8 @@ function HoursView({ canCreate, isAdmin }) {
     hora_salida: "",
     cliente: "",
     proyecto: "",
-    tiempo_estimado: "",
   });
+  const resumenJornada = calcularJornada(form.hora_entrada, form.hora_salida);
 
   useEffect(() => {
     let active = true;
@@ -726,11 +749,20 @@ function HoursView({ canCreate, isAdmin }) {
 
   const saveRecord = async (event) => {
     event.preventDefault();
+    const jornada = calcularJornada(form.hora_entrada, form.hora_salida);
+    if (!jornada || jornada.workedMinutes <= 0) {
+      setError("La salida debe ser posterior a la entrada y la jornada debe superar 1 hora para descontar el almuerzo.");
+      return;
+    }
+
     setSaving(true);
     setError("");
     setSuccess("");
     try {
-      const record = await createHourRecord({ ...form, tiempo_estimado: Number(form.tiempo_estimado) });
+      const record = await createHourRecord({
+        ...form,
+        tiempo_estimado: jornada.workedMinutes / 60,
+      });
       if (isAdmin && (!selectedDate || selectedDate === record.fecha)) {
         setRecords((current) => [record, ...current].sort((a, b) => (
           b.fecha.localeCompare(a.fecha)
@@ -743,7 +775,6 @@ function HoursView({ canCreate, isAdmin }) {
         hora_salida: "",
         cliente: "",
         proyecto: "",
-        tiempo_estimado: "",
       }));
       setSuccess(isAdmin ? "Registro guardado correctamente." : "Horas agregadas correctamente.");
     } catch (requestError) {
@@ -761,18 +792,23 @@ function HoursView({ canCreate, isAdmin }) {
       hora_salida: record.hora_salida,
       cliente: record.cliente,
       proyecto: record.proyecto,
-      tiempo_estimado: String(Number(record.tiempo_estimado)),
     });
     setError("");
   };
 
   const saveEdit = async (event) => {
     event.preventDefault();
+    const jornada = calcularJornada(editForm.hora_entrada, editForm.hora_salida);
+    if (!jornada || jornada.workedMinutes <= 0) {
+      setError("La salida debe ser posterior a la entrada y la jornada debe superar 1 hora para descontar el almuerzo.");
+      return;
+    }
+
     setError("");
     try {
       const updatedRecord = await updateHourRecord(editingId, {
         ...editForm,
-        tiempo_estimado: Number(editForm.tiempo_estimado),
+        tiempo_estimado: jornada.workedMinutes / 60,
       });
       setRecords((current) => current
         .map((record) => record.id === editingId ? updatedRecord : record)
@@ -834,7 +870,7 @@ function HoursView({ canCreate, isAdmin }) {
             </label>
             <label className="admin-field">
               <span>Hora de salida</span>
-              <input type="time" value={form.hora_salida} onChange={(event) => setForm({ ...form, hora_salida: event.target.value })} required />
+              <input type="time" min={form.hora_entrada || undefined} value={form.hora_salida} onChange={(event) => setForm({ ...form, hora_salida: event.target.value })} required />
             </label>
             <label className="admin-field">
               <span>Cliente</span>
@@ -844,11 +880,15 @@ function HoursView({ canCreate, isAdmin }) {
               <span>Proyecto</span>
               {renderProjectField(form.proyecto, (event) => setForm({ ...form, proyecto: event.target.value }))}
             </label>
-            <label className="admin-field">
-              <span>Tiempo estimado (horas)</span>
-              <input type="number" min="0.01" max="24" step="0.25" value={form.tiempo_estimado} onChange={(event) => setForm({ ...form, tiempo_estimado: event.target.value })} required />
-            </label>
           </div>
+          <div className="admin-hours-calculation" aria-live="polite">
+            <div><span>Tiempo total</span><strong>{resumenJornada ? formatoDuracion(resumenJornada.totalMinutes) : "--"}</strong></div>
+            <span className="admin-hours-calculation-operator" aria-hidden="true">−</span>
+            <div><span>Almuerzo</span><strong>1 h</strong></div>
+            <span className="admin-hours-calculation-operator" aria-hidden="true">=</span>
+            <div className="admin-hours-net"><span>Horas trabajadas</span><strong>{resumenJornada ? formatoDuracion(resumenJornada.workedMinutes) : "--"}</strong></div>
+          </div>
+          <p className="admin-hours-hint">El cálculo descuenta automáticamente 1 hora de almuerzo.</p>
           {projectLoadError && <p className="admin-hours-error" role="alert">{projectLoadError}</p>}
           <div className="admin-hours-form-footer">
             {success && <p className="admin-hours-success" role="status">{success}</p>}
@@ -876,45 +916,38 @@ function HoursView({ canCreate, isAdmin }) {
                 <th>Hora de salida</th>
                 <th>Cliente</th>
                 <th>Proyecto</th>
-                <th>Estimado</th>
-                <th>Tiempo real</th>
-                <th>Cumplimiento</th>
+                <th>Almuerzo</th>
+                <th>Horas trabajadas</th>
                 <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
               {records.map((record) => {
                 const actualMinutes = minutosTrabajados(record);
-                const estimatedHours = Number(record.tiempo_estimado);
-                const completion = estimatedHours <= 0
-                  ? null
-                  : actualMinutes <= estimatedHours * 60;
                 return (
                   <tr key={record.id}>
                     {editingId === record.id ? (
-                      <td colSpan="10">
+                      <td colSpan="9">
                         <form className="admin-hour-edit-form" onSubmit={saveEdit}>
                           <label className="admin-field"><span>Fecha</span><input type="date" value={editForm.fecha} onChange={(event) => setEditForm({ ...editForm, fecha: event.target.value })} required /></label>
                           <label className="admin-field"><span>Entrada</span><input type="time" value={editForm.hora_entrada} onChange={(event) => setEditForm({ ...editForm, hora_entrada: event.target.value })} required /></label>
-                          <label className="admin-field"><span>Salida</span><input type="time" value={editForm.hora_salida} onChange={(event) => setEditForm({ ...editForm, hora_salida: event.target.value })} required /></label>
+                          <label className="admin-field"><span>Salida</span><input type="time" min={editForm.hora_entrada || undefined} value={editForm.hora_salida} onChange={(event) => setEditForm({ ...editForm, hora_salida: event.target.value })} required /></label>
                           <label className="admin-field"><span>Cliente</span><input value={editForm.cliente} onChange={(event) => setEditForm({ ...editForm, cliente: event.target.value })} maxLength="180" required /></label>
                           <label className="admin-field"><span>Proyecto</span>{renderProjectField(editForm.proyecto, (event) => setEditForm({ ...editForm, proyecto: event.target.value }))}</label>
-                          <label className="admin-field"><span>Estimado (h)</span><input type="number" min="0.01" max="24" step="0.25" value={editForm.tiempo_estimado} onChange={(event) => setEditForm({ ...editForm, tiempo_estimado: event.target.value })} required /></label>
                           <div className="admin-editor-actions"><button type="button" className="admin-secondary-button" onClick={() => { setEditingId(null); setEditForm(null); }}>Cancelar</button><button type="submit" className="admin-primary-button">Guardar cambios</button></div>
                         </form>
                       </td>
                     ) : (
                       <>
-                        <td>{new Date(`${record.fecha}T00:00:00`).toLocaleDateString("es-CO")}</td>
-                        <td>{record.username}</td>
-                        <td>{record.hora_entrada}</td>
-                        <td>{record.hora_salida}</td>
-                        <td>{record.cliente}</td>
-                        <td>{record.proyecto}</td>
-                        <td>{estimatedHours > 0 ? `${estimatedHours.toFixed(2)} h` : "Sin estimado"}</td>
-                        <td>{(actualMinutes / 60).toFixed(2)} h</td>
-                        <td><span className={`admin-hours-status ${completion === null ? "is-unset" : completion ? "is-complete" : "is-overdue"}`}>{completion === null ? "Sin estimado" : completion ? "Cumplido" : "Excedido"}</span></td>
-                        <td><div className="admin-hour-actions"><button type="button" className="admin-secondary-button" onClick={() => startEditing(record)}>Editar</button><button type="button" className="admin-danger-button" onClick={() => removeRecord(record)}>Eliminar</button></div></td>
+                        <td data-label="Fecha">{new Date(`${record.fecha}T00:00:00`).toLocaleDateString("es-CO")}</td>
+                        <td data-label="Trabajador">{record.username}</td>
+                        <td data-label="Entrada">{record.hora_entrada}</td>
+                        <td data-label="Salida">{record.hora_salida}</td>
+                        <td data-label="Cliente">{record.cliente}</td>
+                        <td data-label="Proyecto">{record.proyecto}</td>
+                        <td data-label="Almuerzo">1 h</td>
+                        <td data-label="Horas trabajadas" className="admin-hours-total-cell">{formatoDuracion(actualMinutes)}</td>
+                        <td data-label="Acciones"><div className="admin-hour-actions"><button type="button" className="admin-secondary-button" onClick={() => startEditing(record)}>Editar</button><button type="button" className="admin-danger-button" onClick={() => removeRecord(record)}>Eliminar</button></div></td>
                       </>
                     )}
                   </tr>

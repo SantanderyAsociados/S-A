@@ -309,7 +309,7 @@ PATCH  /api/admin/registros-horas/:id
 DELETE /api/admin/registros-horas/:id
 ```
 
-La consulta de registros acepta `?fecha=AAAA-MM-DD` para filtrar una jornada desde el calendario del panel. El backend agrega automáticamente las columnas `monthly_salary` y `tiempo_estimado` en instalaciones existentes; no hace falta instalar dependencias adicionales para estas funciones.
+La consulta de registros acepta `?fecha=AAAA-MM-DD` para filtrar una jornada desde el panel. El tiempo trabajado se calcula automáticamente a partir de la hora de entrada y salida, descontando una hora de almuerzo; no se pide ingresar un estimado manual. El resumen muestra la duración total, el descuento y las horas netas, y los registros se presentan como tarjetas adaptables en pantallas estrechas.
 
 Las utilidades cliente centralizan la comunicación:
 - [src/utils/contentApi.js](src/utils/contentApi.js) para contenido.
